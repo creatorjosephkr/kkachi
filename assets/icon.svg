@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="skyGlow" cx="68%" cy="30%" r="48%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.28" />
+      <stop offset="60%" stop-color="#93B5FF" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#6E9BFF" stop-opacity="0" />
+    </radialGradient>
+    <linearGradient id="wingSheen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0F766E" />
+      <stop offset="50%" stop-color="#1D4ED8" />
+      <stop offset="100%" stop-color="#1E293B" />
+    </linearGradient>
+    <linearGradient id="tailSheen" x1="100%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B" />
+      <stop offset="55%" stop-color="#0F766E" />
+      <stop offset="100%" stop-color="#1E3A8A" />
+    </linearGradient>
+    <linearGradient id="envBody" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#F1F5F9" />
+    </linearGradient>
+    <linearGradient id="waxSeal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F87171" />
+      <stop offset="100%" stop-color="#DC2626" />
+    </linearGradient>
+    <filter id="dropShadow" x="-15%" y="-15%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#1E3A8A" flood-opacity="0.32" />
+    </filter>
+    <filter id="envShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#1E3A8A" flood-opacity="0.28" />
+    </filter>
+  </defs>
+
+  <!-- Squircle App Base (#6E9BFF) -->
+  <rect x="32" y="32" width="960" height="960" rx="220" fill="#6E9BFF" />
+  <rect x="32" y="32" width="960" height="960" rx="220" fill="url(#skyGlow)" />
+  <rect x="36" y="36" width="952" height="952" rx="216" fill="none" stroke="#FFFFFF" stroke-opacity="0.25" stroke-width="4" />
+
+  <!-- Subtle Sun / Light Halo Behind Bird & Envelope -->
+  <circle cx="670" cy="310" r="155" fill="#FFFFFF" fill-opacity="0.18" />
+
+  <!-- Minimalist Branch Perch -->
+  <path d="M 190 740 Q 430 660 725 695" fill="none" stroke="#1E293B" stroke-width="18" stroke-linecap="round" opacity="0.82" />
+  <path d="M 190 740 Q 430 660 725 695" fill="none" stroke="#475569" stroke-width="6" stroke-linecap="round" opacity="0.65" />
+
+  <!-- Magpie Group -->
+  <g filter="url(#dropShadow)">
+    <!-- Long Graduated Tail -->
+    <path d="M 358 552 L 152 778 C 142 789 152 806 168 801 L 242 764 L 408 594 Z" fill="url(#tailSheen)" />
+    <path d="M 365 562 L 198 762 L 248 756 L 410 598 Z" fill="#090D16" opacity="0.72" />
+
+    <!-- Feet / Claws on Branch -->
+    <path d="M 435 618 L 424 676 M 424 676 L 402 686 M 424 676 L 434 692" stroke="#1E293B" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <path d="M 488 618 L 496 675 M 496 675 L 478 688 M 496 675 L 514 686" stroke="#1E293B" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+
+    <!-- Smooth Unified Head, Neck & Body (Glossy Black) -->
+    <path d="M 512 260 C 562 260 596 296 594 344 C 592 380 584 416 575 452 C 562 518 532 595 470 622 C 402 652 330 618 326 552 C 322 492 365 425 408 378 C 425 360 426 322 436 298 C 450 270 478 260 512 260 Z" fill="#0B1120" />
+
+    <!-- Subtle Head Highlight -->
+    <path d="M 464 282 C 495 262 544 268 566 296 C 538 282 498 282 464 282 Z" fill="#334155" opacity="0.55" />
+
+    <!-- White Belly & Flank (Distinctive Magpie White) -->
+    <path d="M 482 432 C 538 438 566 492 544 556 C 522 612 456 632 406 616 C 378 606 364 584 374 552 C 392 496 436 426 482 432 Z" fill="#FFFFFF" />
+
+    <!-- Folded Wing with Iridescent Sheen -->
+    <path d="M 366 442 C 408 398 482 396 502 444 C 520 488 474 562 398 594 C 358 610 330 584 338 538 C 344 504 348 462 366 442 Z" fill="url(#wingSheen)" />
+    <path d="M 366 442 C 408 398 482 396 502 444 C 510 465 496 494 468 524 C 446 472 402 448 366 442 Z" fill="#090D16" opacity="0.45" />
+
+    <!-- Classic White Scapular Wing Patch -->
+    <path d="M 392 438 C 430 412 480 422 488 456 C 492 478 462 498 424 502 C 392 504 368 480 392 438 Z" fill="#FFFFFF" />
+
+    <!-- Expressive Eye -->
+    <circle cx="542" cy="324" r="14" fill="#FFFFFF" />
+    <circle cx="545" cy="324" r="9" fill="#0F172A" />
+    <circle cx="549" cy="320" r="3.5" fill="#FFFFFF" />
+
+    <!-- Lower Beak (Behind Envelope Corner) -->
+    <path d="M 580 356 L 656 376 L 575 376 Z" fill="#334155" />
+  </g>
+
+  <!-- Envelope Held in Beak -->
+  <g transform="rotate(-11 642 360)" filter="url(#envShadow)">
+    <rect x="632" y="294" width="236" height="156" rx="18" fill="url(#envBody)" />
+    <rect x="632" y="294" width="236" height="156" rx="18" fill="none" stroke="#94A3B8" stroke-width="3.5" />
+    <!-- Bottom Envelope Fold Lines -->
+    <path d="M 642 440 L 726 374 M 858 440 L 774 374" stroke="#CBD5E1" stroke-width="5" stroke-linecap="round" />
+    <!-- Top Envelope Flap -->
+    <path d="M 638 302 L 750 388 L 862 302" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="5" stroke-linejoin="round" />
+    <!-- Red Wax Seal -->
+    <circle cx="750" cy="382" r="24" fill="url(#waxSeal)" />
+    <circle cx="750" cy="382" r="16" fill="none" stroke="#FECACA" stroke-opacity="0.65" stroke-width="2.5" />
+  </g>
+
+  <!-- Upper Beak (Overlapping Top Edge of Envelope so Bird Clearly Grips It) -->
+  <path d="M 576 328 C 618 330 656 344 676 356 C 648 362 612 362 574 356 Z" fill="#475569" />
+  <path d="M 580 330 C 618 332 650 342 670 353 C 640 347 608 342 580 338 Z" fill="#94A3B8" opacity="0.45" />
+</svg>

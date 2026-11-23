@@ -1,0 +1,132 @@
+import type { AppSettings, MailProviderPreset } from './types';
+
+export const ACCOUNT_COLORS = [
+  '#2563EB', // Blue
+  '#0D9488', // Teal
+  '#7C3AED', // Violet
+  '#EA580C', // Orange
+  '#DB2777', // Pink
+  '#16A34A', // Green
+  '#CA8A04', // Amber
+  '#475569', // Slate
+];
+
+export const MAIL_PROVIDER_PRESETS: MailProviderPreset[] = [
+  {
+    id: 'gmail',
+    label: 'Gmail',
+    imapHost: 'imap.gmail.com',
+    imapPort: 993,
+    imapSecure: true,
+    pop3Host: 'pop.gmail.com',
+    pop3Port: 995,
+    pop3Secure: true,
+    smtpHost: 'smtp.gmail.com',
+    smtpPort: 465,
+    smtpSecure: true,
+    note: 'Google 계정의 2단계 인증을 켠 뒤 "앱 비밀번호"를 발급받아 입력하세요. POP3 사용 시 Gmail 웹 설정(설정 > 전달 및 POP/IMAP > POP 다운로드)에서 POP 사용도 활성화해야 합니다.',
+  },
+  {
+    id: 'naver',
+    label: 'Naver (네이버)',
+    imapHost: 'imap.naver.com',
+    imapPort: 993,
+    imapSecure: true,
+    pop3Host: 'pop.naver.com',
+    pop3Port: 995,
+    pop3Secure: true,
+    smtpHost: 'smtp.naver.com',
+    smtpPort: 465,
+    smtpSecure: true,
+    note: '네이버 메일 환경설정에서 IMAP/POP3 사용함을 켜고, 2단계 인증 시 애플리케이션 비밀번호를 사용하세요.',
+  },
+  {
+    id: 'daum',
+    label: 'Daum / Kakao',
+    imapHost: 'imap.daum.net',
+    imapPort: 993,
+    imapSecure: true,
+    pop3Host: 'pop.daum.net',
+    pop3Port: 995,
+    pop3Secure: true,
+    smtpHost: 'smtp.daum.net',
+    smtpPort: 465,
+    smtpSecure: true,
+    note: 'Daum 메일 설정에서 IMAP/POP3 사용을 활성화하세요. 카카오메일은 imap.kakao.com / pop.kakao.com 을 사용할 수 있습니다.',
+  },
+  {
+    id: 'outlook',
+    label: 'Outlook / Hotmail',
+    imapHost: 'outlook.office365.com',
+    imapPort: 993,
+    imapSecure: true,
+    pop3Host: 'outlook.office365.com',
+    pop3Port: 995,
+    pop3Secure: true,
+    smtpHost: 'smtp.office365.com',
+    smtpPort: 587,
+    smtpSecure: false,
+    note: 'Microsoft 365/Outlook은 조직 정책에 따라 앱 비밀번호 또는 기본 인증 활성화가 필요할 수 있습니다.',
+  },
+  {
+    id: 'icloud',
+    label: 'iCloud Mail',
+    imapHost: 'imap.mail.me.com',
+    imapPort: 993,
+    imapSecure: true,
+    pop3Host: 'imap.mail.me.com',
+    pop3Port: 995,
+    pop3Secure: true,
+    smtpHost: 'smtp.mail.me.com',
+    smtpPort: 587,
+    smtpSecure: false,
+    note: 'iCloud는 IMAP만 지원하며 Apple 계정에서 생성한 앱 암호를 입력해야 합니다.',
+  },
+  {
+    id: 'yahoo',
+    label: 'Yahoo Mail',
+    imapHost: 'imap.mail.yahoo.com',
+    imapPort: 993,
+    imapSecure: true,
+    pop3Host: 'pop.mail.yahoo.com',
+    pop3Port: 995,
+    pop3Secure: true,
+    smtpHost: 'smtp.mail.yahoo.com',
+    smtpPort: 465,
+    smtpSecure: true,
+    note: 'Yahoo 계정 보안 설정에서 앱 비밀번호를 생성해 입력하세요.',
+  },
+  {
+    id: 'custom',
+    label: '직접 입력 (회사/사설 메일)',
+    imapHost: '',
+    imapPort: 993,
+    imapSecure: true,
+    pop3Host: '',
+    pop3Port: 995,
+    pop3Secure: true,
+    smtpHost: '',
+    smtpPort: 465,
+    smtpSecure: true,
+    note: '사내 메일이나 호스팅 메일의 IMAP/POP3 및 SMTP 서버 정보를 직접 입력하세요.',
+  },
+];
+
+export const DEFAULT_SETTINGS: AppSettings = {
+  pollIntervalSec: 30,
+  initialFetchCount: 15,
+  soundEnabled: true,
+  soundPreset: 'kkachi',
+  soundVolume: 0.75,
+  alertPopupEnabled: true,
+  alertDurationSec: 8,
+  nativeNotificationEnabled: false,
+  autoTranslate: true,
+  translationProvider: 'google-free',
+  deeplApiKey: '',
+  openaiApiKey: '',
+  openaiModel: 'gpt-4o-mini',
+  theme: 'system',
+  mascotPosition: 'top-left',
+  minimizeToTrayOnClose: true,
+};
