@@ -46,7 +46,7 @@ jobs:
       - name: Package installers
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: ${{ matrix.dist_cmd }}
+        run: ${{ matrix.dist_cmd }} -- --publish never
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
