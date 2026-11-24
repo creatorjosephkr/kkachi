@@ -392,6 +392,7 @@ export const MascotWidget: React.FC = () => {
             size={112}
             facing={state.facing}
             holdingLetter={hasNewMail}
+            hideBranch={Boolean(state.isPerchedOnWindow)}
             lookX={anim.lookX}
             lookY={anim.lookY}
             mood={anim.mood}

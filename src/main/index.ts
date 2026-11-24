@@ -44,10 +44,13 @@ if (!gotSingleInstanceLock) {
     const preloadPath = path.join(__dirname, '../preload/index.cjs');
     const store = new AppStore(path.join(app.getPath('userData'), 'kkachi-data.json'));
 
+    const initialSettings = store.getSettings();
     const mascotManager = new MascotWindowManager(
       preloadPath,
       store.getUnreadCount(),
-      store.getSettings().mascotPosition
+      initialSettings.mascotPosition,
+      initialSettings.mascotFlightMode,
+      initialSettings.mascotFlightIntervalSec
     );
     const windowSizeState: WindowSizeState = {
       expanded: false,

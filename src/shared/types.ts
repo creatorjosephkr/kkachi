@@ -8,6 +8,8 @@ export type ThemeMode = 'system' | 'light' | 'dark';
 
 export type MascotPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
+export type MascotFlightMode = 'random' | 'fixed' | 'off';
+
 export type MascotFacing = 'right' | 'left';
 
 export type TranslationViewMode = 'split' | 'stacked' | 'original';
@@ -89,6 +91,8 @@ export interface AppSettings {
   openaiModel: string;
   theme: ThemeMode;
   mascotPosition: MascotPosition;
+  mascotFlightMode: MascotFlightMode;
+  mascotFlightIntervalSec: number;
   minimizeToTrayOnClose: boolean;
 }
 
@@ -162,6 +166,7 @@ export interface MascotState {
   hasNewAlert: boolean;
   isChecking: boolean;
   isFlying?: boolean;
+  isPerchedOnWindow?: boolean;
   facing: MascotFacing;
   latestEmailId?: string;
   latestEmailSubject?: string;

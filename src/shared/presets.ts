@@ -128,5 +128,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   openaiModel: 'gpt-4o-mini',
   theme: 'system',
   mascotPosition: 'top-left',
+  mascotFlightMode: 'random',
+  mascotFlightIntervalSec: 60,
   minimizeToTrayOnClose: true,
 };

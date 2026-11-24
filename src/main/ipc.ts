@@ -242,6 +242,12 @@ export function registerIpcHandlers(deps: RegisterIpcDeps): void {
     if (prev.mascotPosition !== updated.mascotPosition) {
       mascotManager.setPositionPreset(updated.mascotPosition);
     }
+    if (
+      prev.mascotFlightMode !== updated.mascotFlightMode ||
+      prev.mascotFlightIntervalSec !== updated.mascotFlightIntervalSec
+    ) {
+      mascotManager.setFlightConfig(updated.mascotFlightMode, updated.mascotFlightIntervalSec);
+    }
     trayManager.refresh();
     const win = getMainWindow();
     if (win && !win.isDestroyed()) {

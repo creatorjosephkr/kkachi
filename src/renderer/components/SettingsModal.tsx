@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import type {
   AppSettings,
+  MascotFlightMode,
   MascotPosition,
   SoundPreset,
   ThemeMode,
@@ -28,6 +29,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onSaved,
 }) => {
   const [draft, setDraft] = useState<AppSettings>({ ...settings });
+  const [flightIntervalMinInput, setFlightIntervalMinInput] = useState<string>(
+    String(Math.max(1, Math.round((settings.mascotFlightIntervalSec ?? 60) / 60)))
+  );
   const [saving, setSaving] = useState(false);
   const backdropMouseDownRef = useRef(false);
 
@@ -35,11 +39,33 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setDraft((prev) => ({ ...prev, [key]: value }));
   };
 
+  const clampFlightMinutes = (raw: string, fallbackMin = 1): number => {
+    const parsed = Number.parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) return fallbackMin;
+    return Math.max(1, Math.min(120, parsed));
+  };
+
+  const formatDurationLabel = (totalSec: number): string => {
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    if (mins === 0) return `${secs}초`;
+    if (secs === 0) return `${mins}분`;
+    return `${mins}분 ${secs}초`;
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      const saved = await window.kkachi.saveSettings(draft);
+      const fallbackMin = Math.max(1, Math.round((draft.mascotFlightIntervalSec || 60) / 60));
+      const normalizedMin = clampFlightMinutes(flightIntervalMinInput, fallbackMin);
+      const nextDraft: AppSettings = {
+        ...draft,
+        mascotFlightIntervalSec: normalizedMin * 60,
+      };
+      setDraft(nextDraft);
+      setFlightIntervalMinInput(String(normalizedMin));
+      const saved = await window.kkachi.saveSettings(nextDraft);
       onSaved(saved);
       onClose();
     } finally {
@@ -303,6 +329,74 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 <option value="bottom-right">화면 오른쪽 아래</option>
               </select>
             </div>
+
+            <div className="form-row-2">
+              <div className="field">
+                <label>까치 비행 이동</label>
+                <select
+                  className="input-field"
+                  value={draft.mascotFlightMode}
+                  onChange={(e) =>
+                    update('mascotFlightMode', e.target.value as MascotFlightMode)
+                  }
+                >
+                  <option value="random">랜덤 간격</option>
+                  <option value="fixed">지정 시간마다</option>
+                  <option value="off">이동 안 함</option>
+                </select>
+              </div>
+              <div className="field">
+                <label>비행 주기 (분)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  className="input-field"
+                  disabled={draft.mascotFlightMode === 'off'}
+                  placeholder="1 ~ 120"
+                  value={flightIntervalMinInput}
+                  onChange={(e) => {
+                    const digitsOnly = e.target.value.replace(/[^\d]/g, '').slice(0, 3);
+                    setFlightIntervalMinInput(digitsOnly);
+                    if (digitsOnly) {
+                      const parsed = Number.parseInt(digitsOnly, 10);
+                      if (Number.isFinite(parsed) && parsed > 0) {
+                        update('mascotFlightIntervalSec', parsed * 60);
+                      }
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!flightIntervalMinInput.trim()) return;
+                    const fallbackMin = Math.max(
+                      1,
+                      Math.round((draft.mascotFlightIntervalSec || 60) / 60)
+                    );
+                    const clampedMin = clampFlightMinutes(flightIntervalMinInput, fallbackMin);
+                    setFlightIntervalMinInput(String(clampedMin));
+                    update('mascotFlightIntervalSec', clampedMin * 60);
+                  }}
+                />
+              </div>
+            </div>
+
+            {draft.mascotFlightMode !== 'off' && (() => {
+              const fallbackMin = Math.max(
+                1,
+                Math.round((draft.mascotFlightIntervalSec || 60) / 60)
+              );
+              const previewMin = clampFlightMinutes(flightIntervalMinInput, fallbackMin);
+              const previewSec = previewMin * 60;
+              const minRandomSec = Math.max(10, Math.round(previewSec * 0.5));
+              const maxRandomSec = Math.max(minRandomSec + 5, Math.round(previewSec * 1.5));
+              return (
+                <div style={{ fontSize: '11.5px', color: 'var(--text-muted)', marginTop: '-4px' }}>
+                  {draft.mascotFlightMode === 'random'
+                    ? `약 ${formatDurationLabel(minRandomSec)} ~ ${formatDurationLabel(
+                        maxRandomSec
+                      )} 사이의 랜덤 간격으로 화면 가장자리나 활성 창 위로 날아 이동합니다.`
+                    : `${previewMin}분마다 화면 가장자리나 활성 창 위로 날아 이동합니다.`}
+                </div>
+              );
+            })()}
 
             <label className="checkbox-inline">
               <input

@@ -7,6 +7,7 @@ export interface Kkachi3DMascotProps {
   size?: number;
   facing?: MascotFacing;
   holdingLetter: boolean;
+  hideBranch?: boolean;
   lookX: number; // -1 (left) .. 1 (right)
   lookY: number; // -1 (up) .. 1 (down)
   mood: MascotMood;
@@ -25,6 +26,7 @@ export const Kkachi3DMascot: React.FC<Kkachi3DMascotProps> = ({
   size = 112,
   facing = 'right',
   holdingLetter,
+  hideBranch = false,
   lookX,
   lookY,
   mood,
@@ -192,8 +194,8 @@ export const Kkachi3DMascot: React.FC<Kkachi3DMascotProps> = ({
       </defs>
 
       <g transform={isMirrored ? 'translate(140 0) scale(-1 1)' : undefined}>
-      {/* 3D Branch Perch (hidden while flying) */}
-      {mood !== 'flying' && (
+      {/* 3D Branch Perch (hidden while flying or perched directly on a window) */}
+      {mood !== 'flying' && !hideBranch && (
         <>
           <path
             d="M 24 109 Q 70 97 116 105"
