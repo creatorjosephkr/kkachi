@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildWanderingFlightPath,
   computeWindowEdgeRange,
   computeWindowPerchTarget,
+  hasPerchedWindowChanged,
+  parseActiveWindowOutput,
   parseBoundsCsv,
   pickRandomPerimeterTarget,
   pickWindowStrollTarget,
+  rectsOverlap,
+  sampleFlightPath,
 } from '../src/main/mascotFlight';
 
 describe('mascotFlight helpers', () => {
@@ -71,5 +76,80 @@ describe('mascotFlight helpers', () => {
     expect(midTarget.atEdge).toBeNull();
     expect(midTarget.x).toBeGreaterThan(range!.leftEdgeX);
     expect(midTarget.x).toBeLessThan(range!.rightEdgeX);
+  });
+
+  it('builds a non-linear wandering flight path avoiding the active window obstacle', () => {
+    const workArea = { x: 0, y: 25, width: 1440, height: 875 };
+    const activeWindow = { x: 350, y: 220, width: 720, height: 500 };
+    const start = { x: 20, y: 400 };
+    const end = { x: 1280, y: 400 };
+
+    const seq = [0.2, 0.3, 0.7, 0.6, 0.4, 0.8, 0.5, 0.2, 0.9, 0.1, 0.6];
+    let idx = 0;
+    const rand = () => seq[idx++ % seq.length];
+
+    const waypoints = buildWanderingFlightPath(start, end, 132, workArea, activeWindow, rand);
+    expect(waypoints.length).toBeGreaterThanOrEqual(4);
+    expect(waypoints[0]).toEqual(start);
+    expect(waypoints[waypoints.length - 1]).toEqual(end);
+
+    // Intermediate waypoints must stay outside the active window body
+    for (const wp of waypoints.slice(1, -1)) {
+      const overlaps = rectsOverlap(
+        { x: wp.x, y: wp.y, width: 132, height: 132 },
+        activeWindow,
+        0
+      );
+      expect(overlaps).toBe(false);
+    }
+
+    // Spline starts at start, ends at end, and curves smoothly
+    const s0 = sampleFlightPath(waypoints, 0);
+    const s1 = sampleFlightPath(waypoints, 1);
+    const sMid = sampleFlightPath(waypoints, 0.5);
+    expect(Math.round(s0.x)).toBe(start.x);
+    expect(Math.round(s0.y)).toBe(start.y);
+    expect(Math.round(s1.x)).toBe(end.x);
+    expect(Math.round(s1.y)).toBe(end.y);
+    expect(Math.abs(sMid.y - 400)).toBeGreaterThan(20);
+  });
+
+  it('parses active window identity output and detects when another window becomes active', () => {
+    expect(parseActiveWindowOutput('SELF')).toEqual({ isSelf: true, window: null });
+    expect(parseActiveWindowOutput('')).toEqual({ isSelf: false, window: null });
+
+    const parsed = parseActiveWindowOutput('120,180,960,720|Safari:GitHub');
+    expect(parsed).toEqual({
+      isSelf: false,
+      window: {
+        id: 'Safari:GitHub',
+        bounds: { x: 120, y: 180, width: 960, height: 720 },
+      },
+    });
+
+    const perched = parsed.window!;
+    // Same window with minor movement -> not changed
+    expect(
+      hasPerchedWindowChanged(perched, {
+        id: 'Safari:GitHub',
+        bounds: { x: 140, y: 190, width: 960, height: 720 },
+      })
+    ).toBe(false);
+
+    // Different window activated -> changed
+    expect(
+      hasPerchedWindowChanged(perched, {
+        id: 'Code:email-moni',
+        bounds: { x: 120, y: 180, width: 960, height: 720 },
+      })
+    ).toBe(true);
+
+    // Same window dragged far away -> changed
+    expect(
+      hasPerchedWindowChanged(perched, {
+        id: 'Safari:GitHub',
+        bounds: { x: 400, y: 350, width: 960, height: 720 },
+      })
+    ).toBe(true);
   });
 });

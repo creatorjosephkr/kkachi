@@ -146,15 +146,23 @@ export const MascotWidget: React.FC = () => {
 
       const hasMail = stateRef.current.unreadCount > 0 || stateRef.current.hasNewAlert;
       const isFlying = Boolean(stateRef.current.isFlying);
+      const isStartled = Boolean(stateRef.current.isStartled);
       const isTeetering = Boolean(stateRef.current.isTeetering);
       const isWalking = Boolean(stateRef.current.isWalking);
-      const isMovingMode = isFlying || isTeetering || isWalking;
+      const isMovingMode = isFlying || isStartled || isTeetering || isWalking;
 
       if (isFlying) {
         idleSinceRef.current = now;
         nextStartleAtRef.current = null;
         if (moodRef.current !== 'flying') {
           moodRef.current = 'flying';
+          moodEnteredAtRef.current = now;
+        }
+      } else if (isStartled) {
+        idleSinceRef.current = now;
+        nextStartleAtRef.current = null;
+        if (moodRef.current !== 'startled') {
+          moodRef.current = 'startled';
           moodEnteredAtRef.current = now;
         }
       } else if (isTeetering) {
@@ -216,7 +224,7 @@ export const MascotWidget: React.FC = () => {
 
       const elapsedInMood = now - moodEnteredAtRef.current;
 
-      if (moodRef.current === 'startled' && elapsedInMood >= STARTLE_DURATION_MS) {
+      if (!isStartled && moodRef.current === 'startled' && elapsedInMood >= STARTLE_DURATION_MS) {
         moodRef.current = 'looking';
         moodEnteredAtRef.current = now;
       } else if (moodRef.current === 'looking' && elapsedInMood >= LOOKING_DURATION_MS) {

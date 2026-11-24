@@ -15,11 +15,17 @@ import type {
 } from '../shared/types';
 import type { AppStore } from './store';
 import {
+  buildWanderingFlightPath,
   computeWindowEdgeRange,
   computeWindowPerchTarget,
+  estimatePathLength,
   getActiveWindowBounds,
+  getActiveWindowInfo,
+  hasPerchedWindowChanged,
   pickRandomPerimeterTarget,
   pickWindowStrollTarget,
+  sampleFlightPath,
+  type ActiveWindowInfo,
   type FlightDestination,
   type Rect,
   type WindowEdgeRange,
@@ -473,6 +479,8 @@ const STROLL_MAX_DELAY_MS = 9500;
 const WALK_SPEED_PX_PER_SEC = 68;
 const SCURRY_SPEED_PX_PER_SEC = 105;
 const TEETER_DURATION_MS = 1350;
+const PERCH_WATCH_INTERVAL_MS = 900;
+const STARTLE_TAKEOFF_DELAY_MS = 550;
 
 export function computeMascotPosition(
   position: MascotPosition,
@@ -526,10 +534,15 @@ export class MascotWindowManager {
   private strollScheduleTimer: NodeJS.Timeout | null = null;
   private strollAnimTimer: NodeJS.Timeout | null = null;
   private teeterTimer: NodeJS.Timeout | null = null;
+  private perchWatchTimer: NodeJS.Timeout | null = null;
+  private startleFlyTimer: NodeJS.Timeout | null = null;
+  private perchWatchInFlight = false;
   private isFlying = false;
   private flightPending = false;
   private isWalking = false;
   private isTeetering = false;
+  private isStartled = false;
+  private perchedWindowInfo: ActiveWindowInfo | null = null;
   private perchedWindowRect: Rect | null = null;
   private perchedWorkArea: Rect | null = null;
   private lastCursorPoint: { x: number; y: number } | null = null;
@@ -541,6 +554,7 @@ export class MascotWindowManager {
     isPerchedOnWindow: false,
     isWalking: false,
     isTeetering: false,
+    isStartled: false,
     facing: 'right',
   };
 
@@ -598,7 +612,9 @@ export class MascotWindowManager {
 
   setPositionPreset(position: MascotPosition): void {
     this.initialPosition = position;
+    this.stopPerchWatcher();
     this.stopStrollTimers(true);
+    this.perchedWindowInfo = null;
     this.perchedWindowRect = null;
     this.perchedWorkArea = null;
     this.cancelFlight(true);
@@ -720,9 +736,121 @@ export class MascotWindowManager {
     }
     this.isFlying = false;
     this.flightPending = false;
+    this.stopPerchWatcher();
     this.stopStrollTimers(false);
+    this.perchedWindowInfo = null;
     this.perchedWindowRect = null;
     this.perchedWorkArea = null;
+  }
+
+  private stopPerchWatcher(): void {
+    if (this.perchWatchTimer) {
+      clearInterval(this.perchWatchTimer);
+      this.perchWatchTimer = null;
+    }
+    if (this.startleFlyTimer) {
+      clearTimeout(this.startleFlyTimer);
+      this.startleFlyTimer = null;
+    }
+    this.perchWatchInFlight = false;
+    if (this.isStartled) {
+      this.isStartled = false;
+      this.updateState({ isStartled: false });
+    }
+  }
+
+  private startPerchWatcher(): void {
+    this.stopPerchWatcher();
+    if (!this.perchedWindowInfo || !this.mascotWin || this.mascotWin.isDestroyed()) return;
+
+    this.perchWatchTimer = setInterval(() => {
+      void this.checkPerchedWindowStillActive();
+    }, PERCH_WATCH_INTERVAL_MS);
+  }
+
+  private async checkPerchedWindowStillActive(): Promise<void> {
+    if (
+      this.perchWatchInFlight ||
+      !this.perchedWindowInfo ||
+      !this.state.isPerchedOnWindow ||
+      !this.mascotWin ||
+      this.mascotWin.isDestroyed() ||
+      this.isFlying ||
+      this.flightPending ||
+      this.isStartled
+    ) {
+      return;
+    }
+
+    this.perchWatchInFlight = true;
+    try {
+      const probe = await getActiveWindowInfo();
+      if (
+        !this.perchedWindowInfo ||
+        !this.state.isPerchedOnWindow ||
+        !this.mascotWin ||
+        this.mascotWin.isDestroyed() ||
+        this.isFlying ||
+        this.isStartled
+      ) {
+        return;
+      }
+
+      // Clicking Kkachi itself shouldn't spook it off the window
+      if (probe.isSelf || !probe.window) {
+        return;
+      }
+
+      const currentDipBounds =
+        process.platform === 'win32'
+          ? screen.screenToDipRect(null, probe.window.bounds)
+          : probe.window.bounds;
+      const currentInfo: ActiveWindowInfo = {
+        id: probe.window.id,
+        bounds: currentDipBounds,
+      };
+
+      if (hasPerchedWindowChanged(this.perchedWindowInfo, currentInfo)) {
+        this.triggerStartledFlyAway(currentInfo.bounds);
+      }
+    } finally {
+      this.perchWatchInFlight = false;
+    }
+  }
+
+  private triggerStartledFlyAway(newActiveWindowBounds: Rect): void {
+    if (!this.mascotWin || this.mascotWin.isDestroyed()) return;
+    this.stopPerchWatcher();
+    this.stopStrollTimers(false);
+    this.perchedWindowInfo = null;
+    this.perchedWindowRect = null;
+    this.perchedWorkArea = null;
+
+    this.isStartled = true;
+    this.updateState({
+      isStartled: true,
+      isWalking: false,
+      isTeetering: false,
+      isPerchedOnWindow: false,
+    });
+
+    this.startleFlyTimer = setTimeout(() => {
+      this.startleFlyTimer = null;
+      this.isStartled = false;
+      if (!this.mascotWin || this.mascotWin.isDestroyed()) return;
+
+      const curBounds = this.mascotWin.getBounds();
+      const display = screen.getDisplayMatching(curBounds);
+      const dest = pickRandomPerimeterTarget(
+        { x: curBounds.x, y: curBounds.y },
+        MASCOT_SIZE,
+        display.workArea,
+        Math.random,
+        newActiveWindowBounds
+      );
+      this.updateState({ isStartled: false });
+      this.launchFlightToDestination(dest, display.workArea, null, newActiveWindowBounds);
+    }, STARTLE_TAKEOFF_DELAY_MS);
   }
 
   private stopStrollTimers(clearState = false): void {
@@ -924,13 +1052,16 @@ export class MascotWindowManager {
       if (flyAway) {
         const curBounds = this.mascotWin.getBounds();
         const display = screen.getDisplayMatching(curBounds);
+        const avoidRect = this.perchedWindowRect;
         const dest = pickRandomPerimeterTarget(
           { x: curBounds.x, y: curBounds.y },
           MASCOT_SIZE,
-          display.workArea
+          display.workArea,
+          Math.random,
+          avoidRect
         );
         this.updateState({ isTeetering: false });
-        this.launchFlightToDestination(dest, display.workArea, null);
+        this.launchFlightToDestination(dest, display.workArea, null, avoidRect);
         return;
       }
 
@@ -959,23 +1090,42 @@ export class MascotWindowManager {
   private launchFlightToDestination(
     destination: FlightDestination,
     destWorkArea: Rect,
-    nextPerchedWindowRect: Rect | null
+    nextPerchedWindowInfo: ActiveWindowInfo | null,
+    avoidWindow: Rect | null = null
   ): void {
     if (!this.mascotWin || this.mascotWin.isDestroyed()) return;
+    this.stopPerchWatcher();
     this.stopStrollTimers(false);
+    this.perchedWindowInfo = null;
     this.perchedWindowRect = null;
     this.perchedWorkArea = null;
 
     const freshStart = this.mascotWin.getBounds();
-    const distance = Math.hypot(destination.x - freshStart.x, destination.y - freshStart.y);
-    if (distance < 40) {
+    const directDist = Math.hypot(destination.x - freshStart.x, destination.y - freshStart.y);
+    if (directDist < 40) {
       this.scheduleNextFlight();
       return;
     }
 
-    const durationMs = Math.max(1300, Math.min(2800, (distance / 320) * 1000));
-    const arcHeight = Math.min(110, Math.max(40, distance * 0.16));
-    const flightFacing: MascotFacing = destination.x >= freshStart.x ? 'right' : 'left';
+    const waypoints = buildWanderingFlightPath(
+      { x: freshStart.x, y: freshStart.y },
+      { x: destination.x, y: destination.y },
+      MASCOT_SIZE,
+      destWorkArea,
+      avoidWindow
+    );
+    const totalPathLen = estimatePathLength(waypoints);
+    const durationMs = Math.max(2000, Math.min(4800, (totalPathLen / 290) * 1000));
+    const initialSample = sampleFlightPath(waypoints, 0.02);
+    let currentFlightFacing: MascotFacing =
+      Math.abs(initialSample.vx) > 1
+        ? initialSample.vx >= 0
+          ? 'right'
+          : 'left'
+        : destination.x >= freshStart.x
+          ? 'right'
+          : 'left';
+
     const minX = Math.min(freshStart.x, destWorkArea.x);
     const maxX = Math.max(freshStart.x, destWorkArea.x + destWorkArea.width - MASCOT_SIZE);
     const minY = Math.min(freshStart.y, destWorkArea.y);
@@ -988,7 +1138,8 @@ export class MascotWindowManager {
       isPerchedOnWindow: false,
       isWalking: false,
       isTeetering: false,
-      facing: flightFacing,
+      isStartled: false,
+      facing: currentFlightFacing,
     });
 
     this.flightAnimTimer = setInterval(() => {
@@ -1003,12 +1154,18 @@ export class MascotWindowManager {
           ? 4 * rawProgress * rawProgress * rawProgress
           : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
 
-      const curX = freshStart.x + (destination.x - freshStart.x) * eased;
-      const curY =
-        freshStart.y +
-        (destination.y - freshStart.y) * eased -
-        Math.sin(Math.PI * eased) * arcHeight +
-        Math.sin(rawProgress * Math.PI * 10) * 3;
+      const sampled = sampleFlightPath(waypoints, eased);
+      const curX = sampled.x;
+      const curY = sampled.y + Math.sin(rawProgress * Math.PI * 14) * 2.5;
+
+      // Flip facing dynamically as Kkachi changes direction mid-flight
+      if (Math.abs(sampled.vx) > 2.5) {
+        const nextFacing: MascotFacing = sampled.vx > 0 ? 'right' : 'left';
+        if (nextFacing !== currentFlightFacing) {
+          currentFlightFacing = nextFacing;
+          this.updateState({ facing: currentFlightFacing });
+        }
+      }
 
       const clampedX = Math.max(minX, Math.min(maxX, Math.round(curX)));
       const clampedY = Math.max(minY, Math.min(maxY, Math.round(curY)));
@@ -1044,9 +1201,11 @@ export class MascotWindowManager {
         });
         this.onMoveCallback?.();
 
-        if (destination.perchedOnWindow && nextPerchedWindowRect) {
-          this.perchedWindowRect = nextPerchedWindowRect;
+        if (destination.perchedOnWindow && nextPerchedWindowInfo) {
+          this.perchedWindowInfo = nextPerchedWindowInfo;
+          this.perchedWindowRect = nextPerchedWindowInfo.bounds;
           this.perchedWorkArea = destWorkArea;
+          this.startPerchWatcher();
           this.scheduleNextStroll();
         }
         this.scheduleNextFlight();
@@ -1060,6 +1219,7 @@ export class MascotWindowManager {
       this.flightAnimTimer = null;
     }
     this.flightPending = false;
+    this.stopPerchWatcher();
     this.stopStrollTimers(true);
     if (this.isFlying) {
       this.isFlying = false;
@@ -1095,7 +1255,7 @@ export class MascotWindowManager {
       this.scheduleNextFlight();
       return;
     }
-    if (this.state.hasNewAlert || this.state.isChecking || this.isTeetering) {
+    if (this.state.hasNewAlert || this.state.isChecking || this.isTeetering || this.isStartled) {
       this.scheduleNextFlight(FLIGHT_BUSY_RETRY_MS);
       return;
     }
@@ -1103,32 +1263,34 @@ export class MascotWindowManager {
     this.flightPending = true;
     let target: FlightDestination | null = null;
     let targetWorkArea = screen.getDisplayMatching(this.mascotWin.getBounds()).workArea;
-    let targetWindowRect: Rect | null = null;
+    let targetWindowInfo: ActiveWindowInfo | null = null;
 
     try {
       const startBounds = this.mascotWin.getBounds();
-      if (Math.random() < WINDOW_PERCH_PROBABILITY) {
-        const rawWin = await getActiveWindowBounds();
-        if (!this.mascotWin || this.mascotWin.isDestroyed() || !this.flightPending) {
-          return;
-        }
-        if (rawWin) {
-          const dipWin =
-            process.platform === 'win32'
-              ? screen.screenToDipRect(null, rawWin)
-              : rawWin;
-          const winDisplay = screen.getDisplayMatching(dipWin);
-          const perch = computeWindowPerchTarget(dipWin, MASCOT_SIZE, winDisplay.workArea);
-          if (perch && Math.hypot(perch.x - startBounds.x, perch.y - startBounds.y) >= 60) {
-            target = perch;
-            targetWorkArea = winDisplay.workArea;
-            targetWindowRect = dipWin;
-          }
-        }
-      }
-
+      const probe = await getActiveWindowInfo();
       if (!this.mascotWin || this.mascotWin.isDestroyed() || !this.flightPending) {
         return;
+      }
+
+      const activeDipWinInfo: ActiveWindowInfo | null = probe.window
+        ? {
+            id: probe.window.id,
+            bounds:
+              process.platform === 'win32'
+                ? screen.screenToDipRect(null, probe.window.bounds)
+                : probe.window.bounds,
+          }
+        : null;
+      const activeDipWin = activeDipWinInfo?.bounds ?? null;
+
+      if (activeDipWinInfo && activeDipWin && Math.random() < WINDOW_PERCH_PROBABILITY) {
+        const winDisplay = screen.getDisplayMatching(activeDipWin);
+        const perch = computeWindowPerchTarget(activeDipWin, MASCOT_SIZE, winDisplay.workArea);
+        if (perch && Math.hypot(perch.x - startBounds.x, perch.y - startBounds.y) >= 60) {
+          target = perch;
+          targetWorkArea = winDisplay.workArea;
+          targetWindowInfo = activeDipWinInfo;
+        }
       }
 
       if (!target) {
@@ -1138,12 +1300,14 @@ export class MascotWindowManager {
         target = pickRandomPerimeterTarget(
           { x: freshStart.x, y: freshStart.y },
           MASCOT_SIZE,
-          targetWorkArea
+          targetWorkArea,
+          Math.random,
+          activeDipWin
         );
       }
 
       this.flightPending = false;
-      this.launchFlightToDestination(target, targetWorkArea, targetWindowRect);
+      this.launchFlightToDestination(target, targetWorkArea, targetWindowInfo, activeDipWin);
     } catch {
       this.flightPending = false;
       this.scheduleNextFlight();
@@ -1195,6 +1359,8 @@ export class MascotWindowManager {
   }
 
   moveBy(dx: number, dy: number): void {
+    this.stopPerchWatcher();
+    this.perchedWindowInfo = null;
     this.perchedWindowRect = null;
     this.perchedWorkArea = null;
     this.cancelFlight(true);
