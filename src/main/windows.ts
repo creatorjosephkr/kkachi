@@ -15,10 +15,14 @@ import type {
 } from '../shared/types';
 import type { AppStore } from './store';
 import {
+  computeWindowEdgeRange,
   computeWindowPerchTarget,
   getActiveWindowBounds,
   pickRandomPerimeterTarget,
+  pickWindowStrollTarget,
   type FlightDestination,
+  type Rect,
+  type WindowEdgeRange,
 } from './mascotFlight';
 
 export function resolveRendererTarget(query?: Record<string, string>): {
@@ -464,6 +468,11 @@ const FLIGHT_MAX_INTERVAL_SEC = 7200;
 const FLIGHT_BUSY_RETRY_MS = 4000;
 const FLIGHT_FRAME_MS = 16;
 const WINDOW_PERCH_PROBABILITY = 0.65;
+const STROLL_MIN_DELAY_MS = 4000;
+const STROLL_MAX_DELAY_MS = 9500;
+const WALK_SPEED_PX_PER_SEC = 68;
+const SCURRY_SPEED_PX_PER_SEC = 105;
+const TEETER_DURATION_MS = 1350;
 
 export function computeMascotPosition(
   position: MascotPosition,
@@ -514,8 +523,15 @@ export class MascotWindowManager {
   private cursorPollTimer: NodeJS.Timeout | null = null;
   private flightScheduleTimer: NodeJS.Timeout | null = null;
   private flightAnimTimer: NodeJS.Timeout | null = null;
+  private strollScheduleTimer: NodeJS.Timeout | null = null;
+  private strollAnimTimer: NodeJS.Timeout | null = null;
+  private teeterTimer: NodeJS.Timeout | null = null;
   private isFlying = false;
   private flightPending = false;
+  private isWalking = false;
+  private isTeetering = false;
+  private perchedWindowRect: Rect | null = null;
+  private perchedWorkArea: Rect | null = null;
   private lastCursorPoint: { x: number; y: number } | null = null;
   private state: MascotState = {
     unreadCount: 0,
@@ -523,6 +539,8 @@ export class MascotWindowManager {
     isChecking: false,
     isFlying: false,
     isPerchedOnWindow: false,
+    isWalking: false,
+    isTeetering: false,
     facing: 'right',
   };
 
@@ -580,6 +598,9 @@ export class MascotWindowManager {
 
   setPositionPreset(position: MascotPosition): void {
     this.initialPosition = position;
+    this.stopStrollTimers(true);
+    this.perchedWindowRect = null;
+    this.perchedWorkArea = null;
     this.cancelFlight(true);
     if (!this.mascotWin || this.mascotWin.isDestroyed()) return;
     const display = screen.getDisplayMatching(this.mascotWin.getBounds());
@@ -699,6 +720,338 @@ export class MascotWindowManager {
     }
     this.isFlying = false;
     this.flightPending = false;
+    this.stopStrollTimers(false);
+    this.perchedWindowRect = null;
+    this.perchedWorkArea = null;
+  }
+
+  private stopStrollTimers(clearState = false): void {
+    if (this.strollScheduleTimer) {
+      clearTimeout(this.strollScheduleTimer);
+      this.strollScheduleTimer = null;
+    }
+    if (this.strollAnimTimer) {
+      clearInterval(this.strollAnimTimer);
+      this.strollAnimTimer = null;
+    }
+    if (this.teeterTimer) {
+      clearTimeout(this.teeterTimer);
+      this.teeterTimer = null;
+    }
+    const wasActive = this.isWalking || this.isTeetering;
+    this.isWalking = false;
+    this.isTeetering = false;
+    if (clearState && (wasActive || this.state.isWalking || this.state.isTeetering)) {
+      this.updateState({ isWalking: false, isTeetering: false });
+    }
+  }
+
+  private scheduleNextStroll(): void {
+    if (this.strollScheduleTimer) {
+      clearTimeout(this.strollScheduleTimer);
+      this.strollScheduleTimer = null;
+    }
+    if (
+      !this.mascotWin ||
+      this.mascotWin.isDestroyed() ||
+      !this.state.isPerchedOnWindow ||
+      !this.perchedWindowRect
+    ) {
+      return;
+    }
+    const delayMs = Math.round(
+      STROLL_MIN_DELAY_MS + Math.random() * (STROLL_MAX_DELAY_MS - STROLL_MIN_DELAY_MS)
+    );
+    this.strollScheduleTimer = setTimeout(() => {
+      this.strollScheduleTimer = null;
+      void this.tryStartWindowStroll();
+    }, delayMs);
+  }
+
+  private async tryStartWindowStroll(): Promise<void> {
+    if (
+      !this.mascotWin ||
+      this.mascotWin.isDestroyed() ||
+      !this.mascotWin.isVisible() ||
+      !this.state.isPerchedOnWindow ||
+      !this.perchedWindowRect ||
+      !this.perchedWorkArea ||
+      this.isFlying ||
+      this.flightPending ||
+      this.isWalking ||
+      this.isTeetering
+    ) {
+      return;
+    }
+
+    if (this.state.hasNewAlert || this.state.isChecking) {
+      this.scheduleNextStroll();
+      return;
+    }
+
+    // Verify the active window is still roughly under Kkachi before walking
+    const rawWin = await getActiveWindowBounds();
+    if (
+      !this.mascotWin ||
+      this.mascotWin.isDestroyed() ||
+      !this.state.isPerchedOnWindow ||
+      this.isFlying ||
+      this.isWalking ||
+      this.isTeetering
+    ) {
+      return;
+    }
+
+    if (rawWin) {
+      const dipWin =
+        process.platform === 'win32' ? screen.screenToDipRect(null, rawWin) : rawWin;
+      const prevWin = this.perchedWindowRect;
+      if (prevWin && Math.abs(dipWin.y - prevWin.y) <= 120) {
+        this.perchedWindowRect = dipWin;
+        this.perchedWorkArea = screen.getDisplayMatching(dipWin).workArea;
+      } else {
+        // Active window changed/moved away -> stop pretending to perch on it
+        this.perchedWindowRect = null;
+        this.perchedWorkArea = null;
+        this.updateState({ isPerchedOnWindow: false });
+        return;
+      }
+    }
+
+    if (!this.perchedWindowRect || !this.perchedWorkArea) return;
+    const range = computeWindowEdgeRange(
+      this.perchedWindowRect,
+      MASCOT_SIZE,
+      this.perchedWorkArea
+    );
+    if (!range) {
+      this.scheduleNextStroll();
+      return;
+    }
+
+    const curBounds = this.mascotWin.getBounds();
+    const strollTarget = pickWindowStrollTarget(curBounds.x, range);
+    if (Math.abs(strollTarget.x - curBounds.x) < 16) {
+      this.scheduleNextStroll();
+      return;
+    }
+
+    this.walkAlongWindowTop(
+      curBounds.x,
+      strollTarget.x,
+      strollTarget.y,
+      WALK_SPEED_PX_PER_SEC,
+      () => {
+        if (strollTarget.atEdge) {
+          this.startEdgeTeeter(strollTarget.atEdge, range);
+        } else {
+          this.updateState({ isWalking: false, isTeetering: false });
+          this.onMoveCallback?.();
+          this.scheduleNextStroll();
+        }
+      }
+    );
+  }
+
+  private walkAlongWindowTop(
+    startX: number,
+    targetX: number,
+    perchY: number,
+    speedPxPerSec: number,
+    onDone: () => void
+  ): void {
+    if (!this.mascotWin || this.mascotWin.isDestroyed()) return;
+    const distance = Math.abs(targetX - startX);
+    const durationMs = Math.max(450, Math.round((distance / speedPxPerSec) * 1000));
+    const walkFacing: MascotFacing = targetX >= startX ? 'right' : 'left';
+    const startTime = Date.now();
+
+    this.isWalking = true;
+    this.isTeetering = false;
+    this.updateState({ isWalking: true, isTeetering: false, facing: walkFacing });
+
+    this.strollAnimTimer = setInterval(() => {
+      if (!this.mascotWin || this.mascotWin.isDestroyed()) {
+        this.stopStrollTimers(false);
+        return;
+      }
+      const p = Math.min(1, (Date.now() - startTime) / durationMs);
+      const curX = Math.round(startX + (targetX - startX) * p);
+      this.mascotWin.setBounds({
+        x: curX,
+        y: perchY,
+        width: MASCOT_SIZE,
+        height: MASCOT_SIZE,
+      });
+
+      if (p >= 1) {
+        if (this.strollAnimTimer) {
+          clearInterval(this.strollAnimTimer);
+          this.strollAnimTimer = null;
+        }
+        this.isWalking = false;
+        this.mascotWin.setBounds({
+          x: targetX,
+          y: perchY,
+          width: MASCOT_SIZE,
+          height: MASCOT_SIZE,
+        });
+        onDone();
+      }
+    }, FLIGHT_FRAME_MS);
+  }
+
+  private startEdgeTeeter(edge: 'left' | 'right', range: WindowEdgeRange): void {
+    if (!this.mascotWin || this.mascotWin.isDestroyed()) return;
+    this.isWalking = false;
+    this.isTeetering = true;
+    // Face outward toward the drop-off edge while flapping frantically
+    this.updateState({
+      isWalking: false,
+      isTeetering: true,
+      facing: edge,
+    });
+
+    this.teeterTimer = setTimeout(() => {
+      this.teeterTimer = null;
+      if (!this.mascotWin || this.mascotWin.isDestroyed() || !this.isTeetering) {
+        return;
+      }
+      this.isTeetering = false;
+
+      // Randomly choose: fly away to another location OR scurry back inward to safety
+      const flyAway = Math.random() < 0.5;
+      if (flyAway) {
+        const curBounds = this.mascotWin.getBounds();
+        const display = screen.getDisplayMatching(curBounds);
+        const dest = pickRandomPerimeterTarget(
+          { x: curBounds.x, y: curBounds.y },
+          MASCOT_SIZE,
+          display.workArea
+        );
+        this.updateState({ isTeetering: false });
+        this.launchFlightToDestination(dest, display.workArea, null);
+        return;
+      }
+
+      // Scurry back inward along the window top
+      const curX = this.mascotWin.getBounds().x;
+      const retreatDist = 110 + Math.random() * 80;
+      const safeTargetX =
+        edge === 'left'
+          ? Math.round(Math.min(range.rightEdgeX - 35, curX + retreatDist))
+          : Math.round(Math.max(range.leftEdgeX + 35, curX - retreatDist));
+
+      this.walkAlongWindowTop(
+        curX,
+        safeTargetX,
+        range.perchY,
+        SCURRY_SPEED_PX_PER_SEC,
+        () => {
+          this.updateState({ isWalking: false, isTeetering: false });
+          this.onMoveCallback?.();
+          this.scheduleNextStroll();
+        }
+      );
+    }, TEETER_DURATION_MS);
+  }
+
+  private launchFlightToDestination(
+    destination: FlightDestination,
+    destWorkArea: Rect,
+    nextPerchedWindowRect: Rect | null
+  ): void {
+    if (!this.mascotWin || this.mascotWin.isDestroyed()) return;
+    this.stopStrollTimers(false);
+    this.perchedWindowRect = null;
+    this.perchedWorkArea = null;
+
+    const freshStart = this.mascotWin.getBounds();
+    const distance = Math.hypot(destination.x - freshStart.x, destination.y - freshStart.y);
+    if (distance < 40) {
+      this.scheduleNextFlight();
+      return;
+    }
+
+    const durationMs = Math.max(1300, Math.min(2800, (distance / 320) * 1000));
+    const arcHeight = Math.min(110, Math.max(40, distance * 0.16));
+    const flightFacing: MascotFacing = destination.x >= freshStart.x ? 'right' : 'left';
+    const minX = Math.min(freshStart.x, destWorkArea.x);
+    const maxX = Math.max(freshStart.x, destWorkArea.x + destWorkArea.width - MASCOT_SIZE);
+    const minY = Math.min(freshStart.y, destWorkArea.y);
+    const maxY = Math.max(freshStart.y, destWorkArea.y + destWorkArea.height - MASCOT_SIZE);
+    const startTime = Date.now();
+
+    this.isFlying = true;
+    this.updateState({
+      isFlying: true,
+      isPerchedOnWindow: false,
+      isWalking: false,
+      isTeetering: false,
+      facing: flightFacing,
+    });
+
+    this.flightAnimTimer = setInterval(() => {
+      if (!this.mascotWin || this.mascotWin.isDestroyed()) {
+        this.stopFlightTimers();
+        return;
+      }
+
+      const rawProgress = Math.min(1, (Date.now() - startTime) / durationMs);
+      const eased =
+        rawProgress < 0.5
+          ? 4 * rawProgress * rawProgress * rawProgress
+          : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
+
+      const curX = freshStart.x + (destination.x - freshStart.x) * eased;
+      const curY =
+        freshStart.y +
+        (destination.y - freshStart.y) * eased -
+        Math.sin(Math.PI * eased) * arcHeight +
+        Math.sin(rawProgress * Math.PI * 10) * 3;
+
+      const clampedX = Math.max(minX, Math.min(maxX, Math.round(curX)));
+      const clampedY = Math.max(minY, Math.min(maxY, Math.round(curY)));
+      this.mascotWin.setBounds({
+        x: clampedX,
+        y: clampedY,
+        width: MASCOT_SIZE,
+        height: MASCOT_SIZE,
+      });
+
+      if (rawProgress >= 1) {
+        if (this.flightAnimTimer) {
+          clearInterval(this.flightAnimTimer);
+          this.flightAnimTimer = null;
+        }
+        this.isFlying = false;
+        this.mascotWin.setBounds({
+          x: destination.x,
+          y: destination.y,
+          width: MASCOT_SIZE,
+          height: MASCOT_SIZE,
+        });
+        const landedFacing = computeMascotFacing(
+          { x: destination.x, width: MASCOT_SIZE },
+          destWorkArea
+        );
+        this.updateState({
+          isFlying: false,
+          isPerchedOnWindow: destination.perchedOnWindow,
+          isWalking: false,
+          isTeetering: false,
+          facing: landedFacing,
+        });
+        this.onMoveCallback?.();
+
+        if (destination.perchedOnWindow && nextPerchedWindowRect) {
+          this.perchedWindowRect = nextPerchedWindowRect;
+          this.perchedWorkArea = destWorkArea;
+          this.scheduleNextStroll();
+        }
+        this.scheduleNextFlight();
+      }
+    }, FLIGHT_FRAME_MS);
   }
 
   private cancelFlight(reschedule = false): void {
@@ -707,15 +1060,28 @@ export class MascotWindowManager {
       this.flightAnimTimer = null;
     }
     this.flightPending = false;
+    this.stopStrollTimers(true);
     if (this.isFlying) {
       this.isFlying = false;
       if (this.mascotWin && !this.mascotWin.isDestroyed()) {
         const bounds = this.mascotWin.getBounds();
         const display = screen.getDisplayMatching(bounds);
         const landedFacing = computeMascotFacing(bounds, display.workArea);
-        this.updateState({ isFlying: false, isPerchedOnWindow: false, facing: landedFacing });
+        this.updateState({
+          isFlying: false,
+          isPerchedOnWindow: false,
+          isWalking: false,
+          isTeetering: false,
+          facing: landedFacing,
+        });
       } else {
-        this.state = { ...this.state, isFlying: false, isPerchedOnWindow: false };
+        this.state = {
+          ...this.state,
+          isFlying: false,
+          isPerchedOnWindow: false,
+          isWalking: false,
+          isTeetering: false,
+        };
       }
     }
     if (reschedule) {
@@ -729,7 +1095,7 @@ export class MascotWindowManager {
       this.scheduleNextFlight();
       return;
     }
-    if (this.state.hasNewAlert || this.state.isChecking) {
+    if (this.state.hasNewAlert || this.state.isChecking || this.isTeetering) {
       this.scheduleNextFlight(FLIGHT_BUSY_RETRY_MS);
       return;
     }
@@ -737,6 +1103,7 @@ export class MascotWindowManager {
     this.flightPending = true;
     let target: FlightDestination | null = null;
     let targetWorkArea = screen.getDisplayMatching(this.mascotWin.getBounds()).workArea;
+    let targetWindowRect: Rect | null = null;
 
     try {
       const startBounds = this.mascotWin.getBounds();
@@ -755,6 +1122,7 @@ export class MascotWindowManager {
           if (perch && Math.hypot(perch.x - startBounds.x, perch.y - startBounds.y) >= 60) {
             target = perch;
             targetWorkArea = winDisplay.workArea;
+            targetWindowRect = dipWin;
           }
         }
       }
@@ -763,8 +1131,8 @@ export class MascotWindowManager {
         return;
       }
 
-      const freshStart = this.mascotWin.getBounds();
       if (!target) {
+        const freshStart = this.mascotWin.getBounds();
         const display = screen.getDisplayMatching(freshStart);
         targetWorkArea = display.workArea;
         target = pickRandomPerimeterTarget(
@@ -774,81 +1142,8 @@ export class MascotWindowManager {
         );
       }
 
-      const distance = Math.hypot(target.x - freshStart.x, target.y - freshStart.y);
-      if (distance < 40) {
-        this.flightPending = false;
-        this.scheduleNextFlight();
-        return;
-      }
-
-      const destination = target;
-      const destWorkArea = targetWorkArea;
-      const durationMs = Math.max(1300, Math.min(2800, (distance / 320) * 1000));
-      const arcHeight = Math.min(110, Math.max(40, distance * 0.16));
-      const flightFacing: MascotFacing = destination.x >= freshStart.x ? 'right' : 'left';
-      const minX = Math.min(freshStart.x, destWorkArea.x);
-      const maxX = Math.max(freshStart.x, destWorkArea.x + destWorkArea.width - MASCOT_SIZE);
-      const minY = Math.min(freshStart.y, destWorkArea.y);
-      const maxY = Math.max(freshStart.y, destWorkArea.y + destWorkArea.height - MASCOT_SIZE);
-      const startTime = Date.now();
-
       this.flightPending = false;
-      this.isFlying = true;
-      this.updateState({ isFlying: true, isPerchedOnWindow: false, facing: flightFacing });
-
-      this.flightAnimTimer = setInterval(() => {
-        if (!this.mascotWin || this.mascotWin.isDestroyed()) {
-          this.stopFlightTimers();
-          return;
-        }
-
-        const rawProgress = Math.min(1, (Date.now() - startTime) / durationMs);
-        const eased =
-          rawProgress < 0.5
-            ? 4 * rawProgress * rawProgress * rawProgress
-            : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
-
-        const curX = freshStart.x + (destination.x - freshStart.x) * eased;
-        const curY =
-          freshStart.y +
-          (destination.y - freshStart.y) * eased -
-          Math.sin(Math.PI * eased) * arcHeight +
-          Math.sin(rawProgress * Math.PI * 10) * 3;
-
-        const clampedX = Math.max(minX, Math.min(maxX, Math.round(curX)));
-        const clampedY = Math.max(minY, Math.min(maxY, Math.round(curY)));
-        this.mascotWin.setBounds({
-          x: clampedX,
-          y: clampedY,
-          width: MASCOT_SIZE,
-          height: MASCOT_SIZE,
-        });
-
-        if (rawProgress >= 1) {
-          if (this.flightAnimTimer) {
-            clearInterval(this.flightAnimTimer);
-            this.flightAnimTimer = null;
-          }
-          this.isFlying = false;
-          this.mascotWin.setBounds({
-            x: destination.x,
-            y: destination.y,
-            width: MASCOT_SIZE,
-            height: MASCOT_SIZE,
-          });
-          const landedFacing = computeMascotFacing(
-            { x: destination.x, width: MASCOT_SIZE },
-            destWorkArea
-          );
-          this.updateState({
-            isFlying: false,
-            isPerchedOnWindow: destination.perchedOnWindow,
-            facing: landedFacing,
-          });
-          this.onMoveCallback?.();
-          this.scheduleNextFlight();
-        }
-      }, FLIGHT_FRAME_MS);
+      this.launchFlightToDestination(target, targetWorkArea, targetWindowRect);
     } catch {
       this.flightPending = false;
       this.scheduleNextFlight();
@@ -900,6 +1195,8 @@ export class MascotWindowManager {
   }
 
   moveBy(dx: number, dy: number): void {
+    this.perchedWindowRect = null;
+    this.perchedWorkArea = null;
     this.cancelFlight(true);
     if (!this.mascotWin || this.mascotWin.isDestroyed()) return;
     if (this.state.isPerchedOnWindow) {

@@ -178,6 +178,8 @@ export interface MascotState {
   isChecking: boolean;
   isFlying?: boolean;
   isPerchedOnWindow?: boolean;
+  isWalking?: boolean;
+  isTeetering?: boolean;
   facing: MascotFacing;
   latestEmailId?: string;
   latestEmailSubject?: string;

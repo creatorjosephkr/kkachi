@@ -1,7 +1,14 @@
 import React from 'react';
 import type { MascotFacing } from '../../shared/types';
 
-export type MascotMood = 'awake' | 'dozing' | 'startled' | 'looking' | 'flying';
+export type MascotMood =
+  | 'awake'
+  | 'dozing'
+  | 'startled'
+  | 'looking'
+  | 'flying'
+  | 'walking'
+  | 'teetering';
 
 export interface Kkachi3DMascotProps {
   size?: number;
@@ -16,6 +23,7 @@ export interface Kkachi3DMascotProps {
   dozeNod: number; // 0 (upright) .. 1 (nodded down)
   jumpOffsetY: number; // vertical jump offset in viewBox units (negative = up)
   dozeTick: number; // 0..1 continuous cycle for floating Zz
+  walkCycle?: number; // continuous phase for walking stride & teeter wobble
 }
 
 function clamp(v: number, min: number, max: number): number {
@@ -35,6 +43,7 @@ export const Kkachi3DMascot: React.FC<Kkachi3DMascotProps> = ({
   dozeNod,
   jumpOffsetY,
   dozeTick,
+  walkCycle = 0,
 }) => {
   const uid = React.useId().replace(/:/g, '');
   const isMirrored = facing === 'left';
@@ -62,14 +71,14 @@ export const Kkachi3DMascot: React.FC<Kkachi3DMascotProps> = ({
 
   const leftEyeRx = 3.6 * (1 - Math.max(0, lx) * 0.45);
   const rightEyeRx = 3.6 * (1 - Math.max(0, -lx) * 0.45);
-  const eyeScale = mood === 'startled' ? 1.14 : 1;
+  const eyeScale = mood === 'teetering' ? 1.2 : mood === 'startled' ? 1.14 : 1;
 
   const pupilShiftX = lx * 1.6;
   const pupilShiftY = ly * 1.4;
 
   // Eyelid closure (0 = open, 1 = closed)
   const eyelidClose =
-    mood === 'startled'
+    mood === 'startled' || mood === 'teetering'
       ? 0
       : mood === 'dozing'
         ? clamp(0.65 + dozeNod * 0.35, 0, 1)
@@ -83,10 +92,44 @@ export const Kkachi3DMascot: React.FC<Kkachi3DMascotProps> = ({
 
   // Wing rotation around shoulder joints (positive swings front wing outward-left; negative lifts back wing upward-right)
   const frontWingDeg =
-    wingFlap * (mood === 'flying' ? 64 : 56) + (mood === 'startled' ? 6 : 0);
-  const backWingDeg = -wingFlap * (mood === 'flying' ? 56 : 48);
+    wingFlap * (mood === 'flying' || mood === 'teetering' ? 66 : 56) +
+    (mood === 'startled' || mood === 'teetering' ? 6 : 0);
+  const backWingDeg = -wingFlap * (mood === 'flying' || mood === 'teetering' ? 58 : 48);
   const wingScaleY = 1 - wingFlap * 0.14;
-  const bodyFlightPitchDeg = mood === 'flying' ? 11 : 0;
+  const bodyFlightPitchDeg =
+    mood === 'flying'
+      ? 11
+      : mood === 'teetering'
+        ? 13 + Math.sin(walkCycle * 1.6) * 11
+        : mood === 'walking'
+          ? 3 + Math.sin(walkCycle) * 3.5
+          : 0;
+
+  // Alternating leg stride offsets when walking or scrambling on edge
+  const leftLegDx =
+    mood === 'walking'
+      ? Math.sin(walkCycle) * 5.2
+      : mood === 'teetering'
+        ? Math.sin(walkCycle * 2.2) * 3.2
+        : 0;
+  const leftLegDy =
+    mood === 'walking'
+      ? -Math.max(0, Math.cos(walkCycle)) * 3.8
+      : mood === 'teetering'
+        ? -Math.abs(Math.sin(walkCycle * 2.2)) * 2.5
+        : 0;
+  const rightLegDx =
+    mood === 'walking'
+      ? -Math.sin(walkCycle) * 5.2
+      : mood === 'teetering'
+        ? -Math.sin(walkCycle * 2.2) * 3.2
+        : 0;
+  const rightLegDy =
+    mood === 'walking'
+      ? -Math.max(0, -Math.cos(walkCycle)) * 3.8
+      : mood === 'teetering'
+        ? -Math.abs(Math.cos(walkCycle * 2.2)) * 2.5
+        : 0;
 
   // Envelope orientation follows facing side smoothly
   const facingSign = lx >= -0.05 ? 1 : -1;
@@ -248,11 +291,26 @@ export const Kkachi3DMascot: React.FC<Kkachi3DMascotProps> = ({
           opacity="0.4"
         />
 
-        {/* 3D Feet & Claws */}
+        {/* 3D Feet & Claws (animated stride while walking or scrambling on edge) */}
         <g stroke="#334155" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M 60 92 L 58 103 M 58 103 L 53.5 105.5 M 58 103 L 61.5 106" />
-          <path d="M 74 92 L 75 102.5 M 75 102.5 L 71 105 M 75 102.5 L 79 105" />
+          <g transform={`translate(${leftLegDx.toFixed(2)} ${leftLegDy.toFixed(2)})`}>
+            <path d="M 60 92 L 58 103 M 58 103 L 53.5 105.5 M 58 103 L 61.5 106" />
+          </g>
+          <g transform={`translate(${rightLegDx.toFixed(2)} ${rightLegDy.toFixed(2)})`}>
+            <path d="M 74 92 L 75 102.5 M 75 102.5 L 71 105 M 75 102.5 L 79 105" />
+          </g>
         </g>
+
+        {/* Cute panic sweat drop when teetering at window corner */}
+        {mood === 'teetering' && (
+          <path
+            d="M 45 26 C 45 26 41 32 41 34.8 C 41 37 42.8 38.6 45 38.6 C 47.2 38.6 49 37 49 34.8 C 49 32 45 26 45 26 Z"
+            fill="#38BDF8"
+            stroke="#0284C7"
+            strokeWidth="0.9"
+            opacity="0.92"
+          />
+        )}
 
         {/* 3D Plump Torso Sphere/Pear */}
         <path

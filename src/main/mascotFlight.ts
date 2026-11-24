@@ -13,6 +13,18 @@ export interface FlightDestination {
   perchedOnWindow: boolean;
 }
 
+export interface WindowEdgeRange {
+  leftEdgeX: number;
+  rightEdgeX: number;
+  perchY: number;
+}
+
+export interface WindowStrollTarget {
+  x: number;
+  y: number;
+  atEdge: 'left' | 'right' | null;
+}
+
 const MASCOT_MARGIN = 20;
 const FLIGHT_MIN_DISTANCE = 240;
 // Claws sit ~94px below the top of the 132x132 mascot window
@@ -138,6 +150,65 @@ export function computeWindowPerchTarget(
   const y = Math.round(Math.max(minY, Math.min(maxY, activeWindow.y - MASCOT_FEET_OFFSET_Y)));
 
   return { x, y, perchedOnWindow: true };
+}
+
+export function computeWindowEdgeRange(
+  activeWindow: Rect,
+  size: number,
+  workArea: Rect
+): WindowEdgeRange | null {
+  if (activeWindow.y - workArea.y < MIN_PERCH_HEADROOM_PX) {
+    return null;
+  }
+
+  const workMinX = workArea.x;
+  const workMaxX = Math.max(workMinX, workArea.x + workArea.width - size);
+  // Allow mascot claws to reach right up to the window's left/right top corners
+  const leftEdgeX = Math.round(Math.max(workMinX, Math.min(workMaxX, activeWindow.x - 14)));
+  const rightEdgeX = Math.round(
+    Math.max(workMinX, Math.min(workMaxX, activeWindow.x + activeWindow.width - size + 14))
+  );
+
+  if (rightEdgeX - leftEdgeX < 80) {
+    return null;
+  }
+
+  const minY = workArea.y;
+  const maxY = Math.max(minY, workArea.y + workArea.height - size);
+  const perchY = Math.round(Math.max(minY, Math.min(maxY, activeWindow.y - MASCOT_FEET_OFFSET_Y)));
+
+  return { leftEdgeX, rightEdgeX, perchY };
+}
+
+export function pickWindowStrollTarget(
+  currentX: number,
+  range: WindowEdgeRange,
+  rand: () => number = Math.random
+): WindowStrollTarget {
+  const goToEdge = rand() < 0.58;
+  if (goToEdge) {
+    const distLeft = Math.abs(currentX - range.leftEdgeX);
+    const distRight = Math.abs(currentX - range.rightEdgeX);
+    // Prefer the farther corner so the stroll across the titlebar is noticeable
+    const chooseLeft =
+      distLeft > distRight + 30
+        ? true
+        : distRight > distLeft + 30
+          ? false
+          : rand() < 0.5;
+    return chooseLeft
+      ? { x: range.leftEdgeX, y: range.perchY, atEdge: 'left' }
+      : { x: range.rightEdgeX, y: range.perchY, atEdge: 'right' };
+  }
+
+  const innerMin = Math.min(range.rightEdgeX, range.leftEdgeX + 45);
+  const innerMax = Math.max(innerMin, range.rightEdgeX - 45);
+  let targetX = Math.round(innerMin + rand() * (innerMax - innerMin));
+  if (Math.abs(targetX - currentX) < 55) {
+    const mid = Math.round((innerMin + innerMax) / 2);
+    targetX = currentX < mid ? innerMax : innerMin;
+  }
+  return { x: targetX, y: range.perchY, atEdge: null };
 }
 
 export function pickRandomPerimeterTarget(

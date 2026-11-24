@@ -16,6 +16,7 @@ interface AnimFrameState {
   dozeNod: number;
   jumpOffsetY: number;
   dozeTick: number;
+  walkCycle: number;
 }
 
 function lerp(a: number, b: number, t: number): number {
@@ -43,6 +44,7 @@ export const MascotWidget: React.FC = () => {
     dozeNod: 0,
     jumpOffsetY: 0,
     dozeTick: 0,
+    walkCycle: 0,
   });
 
   const stateRef = useRef(state);
@@ -144,6 +146,9 @@ export const MascotWidget: React.FC = () => {
 
       const hasMail = stateRef.current.unreadCount > 0 || stateRef.current.hasNewAlert;
       const isFlying = Boolean(stateRef.current.isFlying);
+      const isTeetering = Boolean(stateRef.current.isTeetering);
+      const isWalking = Boolean(stateRef.current.isWalking);
+      const isMovingMode = isFlying || isTeetering || isWalking;
 
       if (isFlying) {
         idleSinceRef.current = now;
@@ -152,13 +157,31 @@ export const MascotWidget: React.FC = () => {
           moodRef.current = 'flying';
           moodEnteredAtRef.current = now;
         }
-      } else if (moodRef.current === 'flying') {
+      } else if (isTeetering) {
+        idleSinceRef.current = now;
+        nextStartleAtRef.current = null;
+        if (moodRef.current !== 'teetering') {
+          moodRef.current = 'teetering';
+          moodEnteredAtRef.current = now;
+        }
+      } else if (isWalking) {
+        idleSinceRef.current = now;
+        nextStartleAtRef.current = null;
+        if (moodRef.current !== 'walking') {
+          moodRef.current = 'walking';
+          moodEnteredAtRef.current = now;
+        }
+      } else if (
+        moodRef.current === 'flying' ||
+        moodRef.current === 'teetering' ||
+        moodRef.current === 'walking'
+      ) {
         moodRef.current = 'awake';
         moodEnteredAtRef.current = now;
         idleSinceRef.current = now;
       }
 
-      if (!isFlying && (hasMail || hoveringRef.current || draggingRef.current)) {
+      if (!isMovingMode && (hasMail || hoveringRef.current || draggingRef.current)) {
         idleSinceRef.current = now;
         if (moodRef.current === 'dozing') {
           moodRef.current = 'awake';
@@ -212,6 +235,7 @@ export const MascotWidget: React.FC = () => {
       let dozeNod = 0;
       let jumpOffsetY = 0;
       let dozeTick = 0;
+      let walkCycle = 0;
 
       if (moodRef.current === 'flying') {
         const sec = elapsedInMood / 1000;
@@ -219,6 +243,20 @@ export const MascotWidget: React.FC = () => {
         goalY = -0.14;
         wingFlap = 0.22 + 0.78 * Math.abs(Math.sin(sec * 16));
         jumpOffsetY = -Math.sin(sec * 16) * 4.5 - 3;
+      } else if (moodRef.current === 'teetering') {
+        const sec = elapsedInMood / 1000;
+        // Look down nervously over the window edge while flapping frantically
+        goalX = stateRef.current.facing === 'left' ? -0.82 : 0.82;
+        goalY = 0.65;
+        wingFlap = 0.35 + 0.65 * Math.abs(Math.sin(sec * 28));
+        jumpOffsetY = -Math.abs(Math.sin(sec * 14)) * 4.5;
+        walkCycle = sec * 12;
+      } else if (moodRef.current === 'walking') {
+        const sec = elapsedInMood / 1000;
+        goalX = stateRef.current.facing === 'left' ? -0.65 : 0.65;
+        goalY = 0.08;
+        walkCycle = sec * 12;
+        jumpOffsetY = -Math.abs(Math.sin(walkCycle)) * 2.4;
       } else if (moodRef.current === 'dozing') {
         const sec = elapsedInMood / 1000;
         // Slow heavy head droop + gentle catch bob
@@ -285,6 +323,7 @@ export const MascotWidget: React.FC = () => {
         dozeNod,
         jumpOffsetY,
         dozeTick,
+        walkCycle,
       };
 
       const prev = lastCommittedAnimRef.current;
@@ -297,7 +336,8 @@ export const MascotWidget: React.FC = () => {
         Math.abs(prev.wingFlap - nextAnim.wingFlap) > 0.005 ||
         Math.abs(prev.dozeNod - nextAnim.dozeNod) > 0.003 ||
         Math.abs(prev.jumpOffsetY - nextAnim.jumpOffsetY) > 0.02 ||
-        Math.abs(prev.dozeTick - nextAnim.dozeTick) > 0.005;
+        Math.abs(prev.dozeTick - nextAnim.dozeTick) > 0.005 ||
+        Math.abs(prev.walkCycle - nextAnim.walkCycle) > 0.02;
 
       if (changed) {
         lastCommittedAnimRef.current = nextAnim;
@@ -401,6 +441,7 @@ export const MascotWidget: React.FC = () => {
             dozeNod={anim.dozeNod}
             jumpOffsetY={anim.jumpOffsetY}
             dozeTick={anim.dozeTick}
+            walkCycle={anim.walkCycle}
           />
           {state.hasNewAlert && <span className="mascot-pulse-ring" />}
           {badgeText && <span className="mascot-badge">{badgeText}</span>}

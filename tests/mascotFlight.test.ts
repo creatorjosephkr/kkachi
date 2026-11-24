@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  computeWindowEdgeRange,
   computeWindowPerchTarget,
   parseBoundsCsv,
   pickRandomPerimeterTarget,
+  pickWindowStrollTarget,
 } from '../src/main/mascotFlight';
 
 describe('mascotFlight helpers', () => {
@@ -47,5 +49,27 @@ describe('mascotFlight helpers', () => {
     expect(dest.x).toBeLessThanOrEqual(1440 - 132 - 20);
     expect(dest.y).toBeGreaterThanOrEqual(45);
     expect(dest.y).toBeLessThanOrEqual(25 + 875 - 132 - 20);
+  });
+
+  it('computes walkable edge range and chooses edge or interior stroll targets', () => {
+    const workArea = { x: 0, y: 25, width: 1440, height: 875 };
+    const activeWindow = { x: 200, y: 200, width: 800, height: 500 };
+
+    const range = computeWindowEdgeRange(activeWindow, 132, workArea);
+    expect(range).not.toBeNull();
+    expect(range!.leftEdgeX).toBe(186);
+    expect(range!.rightEdgeX).toBe(882);
+    expect(range!.perchY).toBe(106);
+
+    // Low random value (< 0.58) targets the farther corner edge
+    const edgeTarget = pickWindowStrollTarget(250, range!, () => 0.2);
+    expect(edgeTarget.atEdge).toBe('right');
+    expect(edgeTarget.x).toBe(range!.rightEdgeX);
+
+    // Higher random value (>= 0.58) targets an interior stroll spot
+    const midTarget = pickWindowStrollTarget(250, range!, () => 0.8);
+    expect(midTarget.atEdge).toBeNull();
+    expect(midTarget.x).toBeGreaterThan(range!.leftEdgeX);
+    expect(midTarget.x).toBeLessThan(range!.rightEdgeX);
   });
 });
