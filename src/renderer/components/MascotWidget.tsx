@@ -143,7 +143,22 @@ export const MascotWidget: React.FC = () => {
       const now = Date.now();
 
       const hasMail = stateRef.current.unreadCount > 0 || stateRef.current.hasNewAlert;
-      if (hasMail || hoveringRef.current || draggingRef.current) {
+      const isFlying = Boolean(stateRef.current.isFlying);
+
+      if (isFlying) {
+        idleSinceRef.current = now;
+        nextStartleAtRef.current = null;
+        if (moodRef.current !== 'flying') {
+          moodRef.current = 'flying';
+          moodEnteredAtRef.current = now;
+        }
+      } else if (moodRef.current === 'flying') {
+        moodRef.current = 'awake';
+        moodEnteredAtRef.current = now;
+        idleSinceRef.current = now;
+      }
+
+      if (!isFlying && (hasMail || hoveringRef.current || draggingRef.current)) {
         idleSinceRef.current = now;
         if (moodRef.current === 'dozing') {
           moodRef.current = 'awake';
@@ -198,7 +213,13 @@ export const MascotWidget: React.FC = () => {
       let jumpOffsetY = 0;
       let dozeTick = 0;
 
-      if (moodRef.current === 'dozing') {
+      if (moodRef.current === 'flying') {
+        const sec = elapsedInMood / 1000;
+        goalX = stateRef.current.facing === 'left' ? -0.78 : 0.78;
+        goalY = -0.14;
+        wingFlap = 0.22 + 0.78 * Math.abs(Math.sin(sec * 16));
+        jumpOffsetY = -Math.sin(sec * 16) * 4.5 - 3;
+      } else if (moodRef.current === 'dozing') {
         const sec = elapsedInMood / 1000;
         // Slow heavy head droop + gentle catch bob
         const wave = Math.sin(sec * 1.45);

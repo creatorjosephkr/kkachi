@@ -1,7 +1,7 @@
 import React from 'react';
 import type { MascotFacing } from '../../shared/types';
 
-export type MascotMood = 'awake' | 'dozing' | 'startled' | 'looking';
+export type MascotMood = 'awake' | 'dozing' | 'startled' | 'looking' | 'flying';
 
 export interface Kkachi3DMascotProps {
   size?: number;
@@ -80,9 +80,11 @@ export const Kkachi3DMascot: React.FC<Kkachi3DMascotProps> = ({
   const beakTipY = beakBaseY + 2.2 + ly * 3.5;
 
   // Wing rotation around shoulder joints (positive swings front wing outward-left; negative lifts back wing upward-right)
-  const frontWingDeg = wingFlap * 56 + (mood === 'startled' ? 6 : 0);
-  const backWingDeg = -wingFlap * 48;
+  const frontWingDeg =
+    wingFlap * (mood === 'flying' ? 64 : 56) + (mood === 'startled' ? 6 : 0);
+  const backWingDeg = -wingFlap * (mood === 'flying' ? 56 : 48);
   const wingScaleY = 1 - wingFlap * 0.14;
+  const bodyFlightPitchDeg = mood === 'flying' ? 11 : 0;
 
   // Envelope orientation follows facing side smoothly
   const facingSign = lx >= -0.05 ? 1 : -1;
@@ -190,25 +192,33 @@ export const Kkachi3DMascot: React.FC<Kkachi3DMascotProps> = ({
       </defs>
 
       <g transform={isMirrored ? 'translate(140 0) scale(-1 1)' : undefined}>
-      {/* 3D Branch Perch */}
-      <path
-        d="M 24 109 Q 70 97 116 105"
-        stroke={`url(#${branchGradId})`}
-        strokeWidth="6.5"
-        strokeLinecap="round"
-        fill="none"
-      />
-      <path
-        d="M 26 107.2 Q 70 95.4 114 103.2"
-        stroke="#A8A29E"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        opacity="0.55"
-        fill="none"
-      />
+      {/* 3D Branch Perch (hidden while flying) */}
+      {mood !== 'flying' && (
+        <>
+          <path
+            d="M 24 109 Q 70 97 116 105"
+            stroke={`url(#${branchGradId})`}
+            strokeWidth="6.5"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <path
+            d="M 26 107.2 Q 70 95.4 114 103.2"
+            stroke="#A8A29E"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            opacity="0.55"
+            fill="none"
+          />
+        </>
+      )}
 
-      {/* Bird Root Group (jumps vertically when startled) */}
-      <g transform={`translate(0 ${jumpOffsetY.toFixed(2)})`}>
+      {/* Bird Root Group (jumps vertically when startled, pitches forward when flying) */}
+      <g
+        transform={`translate(0 ${jumpOffsetY.toFixed(2)})${
+          bodyFlightPitchDeg ? ` rotate(${bodyFlightPitchDeg} 70 72)` : ''
+        }`}
+      >
         {/* Back Wing (flaps behind torso when startled) */}
         <g transform={`translate(76 64) rotate(${backWingDeg.toFixed(1)}) scale(1 ${wingScaleY.toFixed(2)})`}>
           <path

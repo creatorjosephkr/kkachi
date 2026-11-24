@@ -11,6 +11,7 @@ import { EmailList } from './components/EmailList';
 import { EmailViewer } from './components/EmailViewer';
 import { AccountModal } from './components/AccountModal';
 import { SettingsModal } from './components/SettingsModal';
+import { SponsorModal } from './components/SponsorModal';
 
 export const App: React.FC = () => {
   const [accounts, setAccounts] = useState<AccountPublic[]>([]);
@@ -33,6 +34,7 @@ export const App: React.FC = () => {
   const [accountModalOpen, setAccountModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AccountPublic | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sponsorModalOpen, setSponsorModalOpen] = useState(false);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState<AccountPublic | null>(null);
   const deleteBackdropMouseDownRef = useRef(false);
 
@@ -234,6 +236,7 @@ export const App: React.FC = () => {
         onCheckNow={() => void window.kkachi.checkNow()}
         onToggleSound={() => void handleToggleSound()}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSponsor={() => setSponsorModalOpen(true)}
       />
 
       <EmailList
@@ -287,6 +290,10 @@ export const App: React.FC = () => {
           onClose={() => setSettingsOpen(false)}
           onSaved={(updated) => setSettings(updated)}
         />
+      )}
+
+      {sponsorModalOpen && (
+        <SponsorModal onClose={() => setSponsorModalOpen(false)} />
       )}
 
       {confirmDeleteAccount && (

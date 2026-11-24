@@ -1,4 +1,5 @@
 import React from 'react';
+import sponIconUrl from '../../../spon/spon.svg';
 import type {
   AccountPublic,
   EmailMessage,
@@ -30,6 +31,7 @@ interface SidebarProps {
   onCheckNow: () => void;
   onToggleSound: () => void;
   onOpenSettings: () => void;
+  onOpenSponsor: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -45,6 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCheckNow,
   onToggleSound,
   onOpenSettings,
+  onOpenSponsor,
 }) => {
   const totalUnread = emails.filter((e) => !e.isRead).length;
 
@@ -116,6 +119,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
           {totalUnread > 0 && <span className="unread-pill">{totalUnread}</span>}
         </button>
+
+        <div className="status-bar sidebar-status-inline" title={statusText}>
+          <span
+            className={`account-dot ${monitorStatus.isChecking ? 'checking' : ''}`}
+            style={{
+              backgroundColor: monitorStatus.isChecking ? 'var(--accent)' : 'var(--success)',
+            }}
+          />
+          <span className="status-bar-text">{statusText}</span>
+        </div>
 
         <div className="nav-section-header">
           <span>이메일 계정 ({accounts.length})</span>
@@ -225,14 +238,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       <div className="sidebar-footer">
-        <div className="status-bar" title={statusText}>
-          <span
-            className={`account-dot ${monitorStatus.isChecking ? 'checking' : ''}`}
-            style={{
-              backgroundColor: monitorStatus.isChecking ? 'var(--accent)' : 'var(--success)',
-            }}
-          />
-          <span className="status-bar-text">{statusText}</span>
+        <div className="sponsor-row">
+          <button
+            type="button"
+            className="sponsor-btn"
+            title="개발자 후원하기"
+            aria-label="개발자 후원하기"
+            onClick={onOpenSponsor}
+          >
+            <img
+              src={sponIconUrl}
+              alt="개발자 후원하기"
+              className="sponsor-icon-img"
+              draggable={false}
+            />
+          </button>
         </div>
 
         <div className="sidebar-footer-btns">

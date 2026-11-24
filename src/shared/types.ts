@@ -161,6 +161,7 @@ export interface MascotState {
   unreadCount: number;
   hasNewAlert: boolean;
   isChecking: boolean;
+  isFlying?: boolean;
   facing: MascotFacing;
   latestEmailId?: string;
   latestEmailSubject?: string;
