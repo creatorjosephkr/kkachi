@@ -391,11 +391,17 @@ export const MascotWidget: React.FC = () => {
       }
     };
 
+    const handlePointerCancel = () => {
+      draggingRef.current = false;
+    };
+
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerCancel);
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerCancel);
     };
   }, []);
 
@@ -428,6 +434,11 @@ export const MascotWidget: React.FC = () => {
           draggingRef.current = true;
           lastScreenPosRef.current = { x: e.screenX, y: e.screenY };
           totalMovedRef.current = 0;
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            // Ignore pointer capture errors on unsupported targets
+          }
         }}
         onContextMenu={(e) => {
           e.preventDefault();

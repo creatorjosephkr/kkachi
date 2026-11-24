@@ -375,7 +375,8 @@ export class AlertWindowManager {
       thickFrame: false,
       transparent: true,
       backgroundColor: '#00000000',
-      ...(process.platform === 'darwin' ? { roundedCorners: false } : {}),
+      ...(process.platform === 'win32' ? { backgroundMaterial: 'none' as const } : {}),
+      roundedCorners: false,
       alwaysOnTop: true,
       focusable: false,
       skipTaskbar: true,
@@ -659,8 +660,11 @@ export class MascotWindowManager {
       thickFrame: false,
       transparent: true,
       backgroundColor: '#00000000',
-      ...(process.platform === 'darwin' ? { roundedCorners: false } : {}),
+      ...(process.platform === 'win32' ? { backgroundMaterial: 'none' as const } : {}),
+      roundedCorners: false,
       alwaysOnTop: true,
+      // On Windows, WS_EX_NOACTIVATE prevents WM_NCACTIVATE from painting a stuck white caption box on click.
+      focusable: process.platform !== 'win32',
       skipTaskbar: true,
       resizable: false,
       minimizable: false,
@@ -682,6 +686,15 @@ export class MascotWindowManager {
     win.on('page-title-updated', (event) => {
       event.preventDefault();
     });
+    if (process.platform === 'win32') {
+      const clearWinFrameArtifact = () => {
+        if (win.isDestroyed()) return;
+        win.setBackgroundColor('#00000000');
+        win.webContents.invalidate();
+      };
+      win.on('focus', clearWinFrameArtifact);
+      win.on('blur', clearWinFrameArtifact);
+    }
 
     win.setAlwaysOnTop(true, 'floating');
     if (process.platform === 'darwin') {
@@ -1450,7 +1463,18 @@ export class MascotWindowManager {
     );
 
     const menu = Menu.buildFromTemplate(template);
-    menu.popup({ window: this.mascotWin });
+    menu.popup({
+      window: this.mascotWin,
+      callback: () => {
+        if (process.platform === 'win32' && this.mascotWin && !this.mascotWin.isDestroyed()) {
+          if (this.mascotWin.isFocused()) {
+            this.mascotWin.blur();
+          }
+          this.mascotWin.setBackgroundColor('#00000000');
+          this.mascotWin.webContents.invalidate();
+        }
+      },
+    });
   }
 
   destroy(): void {
