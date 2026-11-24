@@ -375,7 +375,6 @@ export class AlertWindowManager {
       thickFrame: false,
       transparent: true,
       backgroundColor: '#00000000',
-      ...(process.platform === 'win32' ? { backgroundMaterial: 'none' as const } : {}),
       roundedCorners: false,
       alwaysOnTop: true,
       focusable: false,
@@ -667,7 +666,6 @@ export class MascotWindowManager {
       thickFrame: false,
       transparent: true,
       backgroundColor: '#00000000',
-      ...(process.platform === 'win32' ? { backgroundMaterial: 'none' as const } : {}),
       roundedCorners: false,
       alwaysOnTop: true,
       // On Windows, WS_EX_NOACTIVATE prevents WM_NCACTIVATE from painting a stuck white caption box on click.
