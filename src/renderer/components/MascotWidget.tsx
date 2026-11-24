@@ -395,13 +395,19 @@ export const MascotWidget: React.FC = () => {
       draggingRef.current = false;
     };
 
+    const handleWindowContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
     window.addEventListener('pointermove', handlePointerMove);
     window.addEventListener('pointerup', handlePointerUp);
     window.addEventListener('pointercancel', handlePointerCancel);
+    window.addEventListener('contextmenu', handleWindowContextMenu, { capture: true });
     return () => {
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
       window.removeEventListener('pointercancel', handlePointerCancel);
+      window.removeEventListener('contextmenu', handleWindowContextMenu, { capture: true });
     };
   }, []);
 

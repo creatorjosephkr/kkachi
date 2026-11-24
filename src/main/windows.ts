@@ -400,6 +400,12 @@ export class AlertWindowManager {
     win.on('page-title-updated', (event) => {
       event.preventDefault();
     });
+    win.on('system-context-menu', (event) => {
+      event.preventDefault();
+    });
+    win.webContents.on('context-menu', (event) => {
+      event.preventDefault();
+    });
 
     win.setAlwaysOnTop(true, 'floating');
     if (process.platform === 'darwin') {
@@ -687,7 +693,19 @@ export class MascotWindowManager {
     win.on('page-title-updated', (event) => {
       event.preventDefault();
     });
+    win.on('system-context-menu', (event) => {
+      event.preventDefault();
+    });
+    win.webContents.on('context-menu', (event) => {
+      event.preventDefault();
+    });
     if (process.platform === 'win32') {
+      const WM_INITMENU = 0x0116;
+      win.hookWindowMessage(WM_INITMENU, () => {
+        if (win.isDestroyed()) return;
+        win.setEnabled(false);
+        win.setEnabled(true);
+      });
       const clearWinFrameArtifact = () => {
         if (win.isDestroyed()) return;
         win.setBackgroundColor('#00000000');
