@@ -370,16 +370,22 @@ export class AlertWindowManager {
     const win = new BrowserWindow({
       width: ALERT_WIDTH,
       height: ALERT_HEIGHT,
+      title: '',
       frame: false,
+      thickFrame: false,
       transparent: true,
       backgroundColor: '#00000000',
-      roundedCorners: false,
+      ...(process.platform === 'darwin' ? { roundedCorners: false } : {}),
       alwaysOnTop: true,
       focusable: false,
       skipTaskbar: true,
       resizable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
       movable: false,
       hasShadow: false,
+      autoHideMenuBar: true,
       show: false,
       webPreferences: {
         preload: this.preloadPath,
@@ -389,6 +395,10 @@ export class AlertWindowManager {
       },
     });
     win.setBackgroundColor('#00000000');
+    win.removeMenu();
+    win.on('page-title-updated', (event) => {
+      event.preventDefault();
+    });
 
     win.setAlwaysOnTop(true, 'floating');
     if (process.platform === 'darwin') {
@@ -644,15 +654,21 @@ export class MascotWindowManager {
       height: MASCOT_SIZE,
       x: coords.x,
       y: coords.y,
+      title: '',
       frame: false,
+      thickFrame: false,
       transparent: true,
       backgroundColor: '#00000000',
-      roundedCorners: false,
+      ...(process.platform === 'darwin' ? { roundedCorners: false } : {}),
       alwaysOnTop: true,
       skipTaskbar: true,
       resizable: false,
+      minimizable: false,
+      maximizable: false,
+      fullscreenable: false,
       movable: true,
       hasShadow: false,
+      autoHideMenuBar: true,
       show: false,
       webPreferences: {
         preload: this.preloadPath,
@@ -662,6 +678,10 @@ export class MascotWindowManager {
       },
     });
     win.setBackgroundColor('#00000000');
+    win.removeMenu();
+    win.on('page-title-updated', (event) => {
+      event.preventDefault();
+    });
 
     win.setAlwaysOnTop(true, 'floating');
     if (process.platform === 'darwin') {

@@ -1,6 +1,6 @@
 {
   "name": "kkachi",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "까치 (Kkachi) - IMAP/POP3 순차 이메일 모니터링 및 자동 번역 데스크톱 앱",
   "main": "dist/main/index.cjs",
   "author": "Kkachi",

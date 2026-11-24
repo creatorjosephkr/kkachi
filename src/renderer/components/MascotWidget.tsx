@@ -93,6 +93,7 @@ export const MascotWidget: React.FC = () => {
   };
 
   useEffect(() => {
+    document.title = '';
     document.documentElement.classList.add('mascot-mode');
     document.body.classList.add('mascot-mode');
 
