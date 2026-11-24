@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type {
   AccountInput,
   AppSettings,
+  AppUpdateInfo,
   EmailExportMode,
   KkachiAPI,
   MascotCursorDelta,
@@ -48,6 +49,8 @@ const api: KkachiAPI = {
   showMascotStatusNotice: (message: string) => ipcRenderer.invoke('mascot:statusNotice', message),
   setWindowExpanded: (expanded: boolean) => ipcRenderer.invoke('window:setExpanded', expanded),
   openExternal: (url: string) => ipcRenderer.invoke('app:openExternal', url),
+  getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
+  checkAppUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
   onMonitorStatus: (cb: (status: MonitorStatus) => void) => subscribe('monitor:status', cb),
   onEmailsUpdated: (cb: () => void) => subscribe('emails:updated', () => cb()),
   onSelectEmail: (cb: (emailId: string) => void) => subscribe('email:select', cb),
@@ -55,6 +58,8 @@ const api: KkachiAPI = {
   onSettingsUpdated: (cb: (settings: AppSettings) => void) => subscribe('settings:updated', cb),
   onMascotState: (cb: (state: MascotState) => void) => subscribe('mascot:state', cb),
   onMascotCursor: (cb: (delta: MascotCursorDelta) => void) => subscribe('mascot:cursor', cb),
+  onAppUpdateAvailable: (cb: (info: AppUpdateInfo) => void) =>
+    subscribe('app:updateAvailable', cb),
 };
 
 contextBridge.exposeInMainWorld('kkachi', api);

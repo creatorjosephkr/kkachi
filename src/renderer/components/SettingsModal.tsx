@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type {
   AppSettings,
+  AppUpdateInfo,
   MascotFlightMode,
   MascotPosition,
   SoundPreset,
@@ -21,19 +22,50 @@ interface SettingsModalProps {
   settings: AppSettings;
   onClose: () => void;
   onSaved: (updated: AppSettings) => void;
+  onOpenUpdate?: (info: AppUpdateInfo) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   settings,
   onClose,
   onSaved,
+  onOpenUpdate,
 }) => {
   const [draft, setDraft] = useState<AppSettings>({ ...settings });
   const [flightIntervalMinInput, setFlightIntervalMinInput] = useState<string>(
     String(Math.max(1, Math.round((settings.mascotFlightIntervalSec ?? 60) / 60)))
   );
   const [saving, setSaving] = useState(false);
+  const [appVersion, setAppVersion] = useState('1.0.0');
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [updateCheckMsg, setUpdateCheckMsg] = useState<string | null>(null);
   const backdropMouseDownRef = useRef(false);
+
+  useEffect(() => {
+    void window.kkachi.getAppVersion().then((v) => {
+      if (v) setAppVersion(v);
+    });
+  }, []);
+
+  const handleCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    setUpdateCheckMsg(null);
+    try {
+      const info = await window.kkachi.checkAppUpdate();
+      if (info.hasUpdate && onOpenUpdate) {
+        onOpenUpdate(info);
+        onClose();
+        return;
+      }
+      if (info.error) {
+        setUpdateCheckMsg(info.error);
+      } else {
+        setUpdateCheckMsg(`최신 버전(v${info.latestVersion || appVersion})입니다.`);
+      }
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
 
   const update = <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
     setDraft((prev) => ({ ...prev, [key]: value }));
@@ -410,8 +442,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         </div>
 
         <div className="modal-footer">
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-            까치 (Kkachi) v1.0.0
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+              까치 (Kkachi) v{appVersion}
+            </span>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ padding: '4px 9px', fontSize: '11.5px' }}
+              disabled={checkingUpdate}
+              onClick={() => void handleCheckUpdate()}
+            >
+              {checkingUpdate ? '확인 중...' : '업데이트 확인'}
+            </button>
+            {updateCheckMsg && (
+              <span style={{ fontSize: '11.5px', color: 'var(--text-secondary)' }}>
+                {updateCheckMsg}
+              </span>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
             <button type="button" className="btn btn-ghost" onClick={onClose}>

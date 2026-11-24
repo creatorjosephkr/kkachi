@@ -161,6 +161,17 @@ export interface EmailExportResult {
   error?: string;
 }
 
+export interface AppUpdateInfo {
+  currentVersion: string;
+  latestVersion: string;
+  hasUpdate: boolean;
+  releaseName: string;
+  releaseNotes: string;
+  releaseUrl: string;
+  publishedAt?: string;
+  error?: string;
+}
+
 export interface MascotState {
   unreadCount: number;
   hasNewAlert: boolean;
@@ -205,6 +216,8 @@ export interface KkachiAPI {
   showMascotStatusNotice: (message: string) => Promise<void>;
   setWindowExpanded: (expanded: boolean) => Promise<void>;
   openExternal: (url: string) => Promise<void>;
+  getAppVersion: () => Promise<string>;
+  checkAppUpdate: () => Promise<AppUpdateInfo>;
   onMonitorStatus: (cb: (status: MonitorStatus) => void) => () => void;
   onEmailsUpdated: (cb: () => void) => () => void;
   onSelectEmail: (cb: (emailId: string) => void) => () => void;
@@ -212,4 +225,5 @@ export interface KkachiAPI {
   onSettingsUpdated: (cb: (settings: AppSettings) => void) => () => void;
   onMascotState: (cb: (state: MascotState) => void) => () => void;
   onMascotCursor: (cb: (delta: MascotCursorDelta) => void) => () => void;
+  onAppUpdateAvailable: (cb: (info: AppUpdateInfo) => void) => () => void;
 }

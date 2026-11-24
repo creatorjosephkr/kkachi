@@ -12,6 +12,8 @@ import {
 } from './windows';
 import { TrayManager } from './tray';
 import { registerIpcHandlers } from './ipc';
+import { checkForGitHubReleaseUpdate } from './updater';
+import type { AppUpdateInfo } from '../shared/types';
 
 let mainWindow: BrowserWindow | null = null;
 const isQuittingRef = { current: false };
@@ -58,11 +60,21 @@ if (!gotSingleInstanceLock) {
       expandedWidth: EXPANDED_WINDOW_WIDTH,
     };
 
+    let latestUpdateInfo: AppUpdateInfo | null = null;
+    let lastNotifiedUpdateVersion: string | null = null;
+    let startupUpdateTimer: NodeJS.Timeout | null = null;
+    let periodicUpdateTimer: NodeJS.Timeout | null = null;
+
     const createManagedMainWindow = (showOnReady: boolean): BrowserWindow => {
       windowSizeState.expanded = false;
       const win = createMainWindow(preloadPath, store, isQuittingRef, showOnReady);
       win.on('show', () => {
         mascotManager.updateState({ hasNewAlert: false });
+      });
+      win.webContents.on('did-finish-load', () => {
+        if (!win.isDestroyed() && latestUpdateInfo?.hasUpdate) {
+          win.webContents.send('app:updateAvailable', latestUpdateInfo);
+        }
       });
       return win;
     };
@@ -107,8 +119,48 @@ if (!gotSingleInstanceLock) {
 
     let trayManager: TrayManager | null = null;
 
+    const clearUpdateTimers = () => {
+      if (startupUpdateTimer) {
+        clearTimeout(startupUpdateTimer);
+        startupUpdateTimer = null;
+      }
+      if (periodicUpdateTimer) {
+        clearInterval(periodicUpdateTimer);
+        periodicUpdateTimer = null;
+      }
+    };
+
+    const runUpdateCheck = async (notifyIfAvailable: boolean): Promise<AppUpdateInfo> => {
+      const info = await checkForGitHubReleaseUpdate(app.getVersion());
+      if (info.hasUpdate) {
+        latestUpdateInfo = info;
+      } else if (!info.error) {
+        latestUpdateInfo = null;
+      }
+
+      if (
+        notifyIfAvailable &&
+        info.hasUpdate &&
+        info.latestVersion !== lastNotifiedUpdateVersion
+      ) {
+        lastNotifiedUpdateVersion = info.latestVersion;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('app:updateAvailable', info);
+        }
+        if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) {
+          alertManager.showStatusNotice(
+            `새 버전 v${info.latestVersion} 업데이트가 있습니다`,
+            5
+          );
+        }
+      }
+
+      return info;
+    };
+
     const quitApp = () => {
       isQuittingRef.current = true;
+      clearUpdateTimers();
       monitor.stop();
       alertManager.destroy();
       mascotManager.destroy();
@@ -163,10 +215,19 @@ if (!gotSingleInstanceLock) {
       windowSizeState,
       getMainWindow: () => mainWindow,
       openMainWindow,
+      checkAppUpdate: () => runUpdateCheck(false),
       quitApp,
     });
 
     monitor.start();
+
+    startupUpdateTimer = setTimeout(() => {
+      startupUpdateTimer = null;
+      void runUpdateCheck(true);
+    }, 5000);
+    periodicUpdateTimer = setInterval(() => {
+      void runUpdateCheck(true);
+    }, 6 * 60 * 60 * 1000);
 
     app.on('activate', () => {
       openMainWindow();
@@ -174,6 +235,7 @@ if (!gotSingleInstanceLock) {
 
     app.on('before-quit', () => {
       isQuittingRef.current = true;
+      clearUpdateTimers();
       monitor.stop();
       alertManager.destroy();
       mascotManager.destroy();

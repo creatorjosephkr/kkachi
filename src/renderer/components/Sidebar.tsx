@@ -32,6 +32,8 @@ interface SidebarProps {
   onToggleSound: () => void;
   onOpenSettings: () => void;
   onOpenSponsor: () => void;
+  updateVersion?: string | null;
+  onOpenUpdate?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -48,6 +50,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleSound,
   onOpenSettings,
   onOpenSponsor,
+  updateVersion,
+  onOpenUpdate,
 }) => {
   const totalUnread = emails.filter((e) => !e.isRead).length;
 
@@ -238,6 +242,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </nav>
 
       <div className="sidebar-footer">
+        {updateVersion && onOpenUpdate && (
+          <button
+            type="button"
+            className="update-pill-btn"
+            title={`새 버전 v${updateVersion} 업데이트 내역 보기`}
+            onClick={onOpenUpdate}
+          >
+            새 업데이트 v{updateVersion}
+          </button>
+        )}
+
         <div className="sponsor-row">
           <button
             type="button"

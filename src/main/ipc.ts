@@ -1,8 +1,9 @@
-import { BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import type {
   AccountConfig,
   AccountInput,
   AppSettings,
+  AppUpdateInfo,
   EmailExportMode,
   ReplyPayload,
 } from '../shared/types';
@@ -30,6 +31,7 @@ interface RegisterIpcDeps {
   windowSizeState: WindowSizeState;
   getMainWindow: () => BrowserWindow | null;
   openMainWindow: (emailId?: string) => void;
+  checkAppUpdate: () => Promise<AppUpdateInfo>;
   quitApp: () => void;
 }
 
@@ -64,6 +66,7 @@ export function registerIpcHandlers(deps: RegisterIpcDeps): void {
     windowSizeState,
     getMainWindow,
     openMainWindow,
+    checkAppUpdate,
     quitApp,
   } = deps;
 
@@ -346,4 +349,8 @@ export function registerIpcHandlers(deps: RegisterIpcDeps): void {
       await shell.openExternal(url);
     }
   });
+
+  ipcMain.handle('app:getVersion', () => app.getVersion());
+
+  ipcMain.handle('app:checkUpdate', () => checkAppUpdate());
 }

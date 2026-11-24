@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type {
   AccountPublic,
   AppSettings,
+  AppUpdateInfo,
   EmailMessage,
   MonitorStatus,
 } from '../shared/types';
@@ -12,6 +13,7 @@ import { EmailViewer } from './components/EmailViewer';
 import { AccountModal } from './components/AccountModal';
 import { SettingsModal } from './components/SettingsModal';
 import { SponsorModal } from './components/SponsorModal';
+import { UpdateModal } from './components/UpdateModal';
 
 export const App: React.FC = () => {
   const [accounts, setAccounts] = useState<AccountPublic[]>([]);
@@ -35,6 +37,9 @@ export const App: React.FC = () => {
   const [editingAccount, setEditingAccount] = useState<AccountPublic | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sponsorModalOpen, setSponsorModalOpen] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<AppUpdateInfo | null>(null);
+  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const dismissedUpdateVersionRef = useRef<string | null>(null);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState<AccountPublic | null>(null);
   const deleteBackdropMouseDownRef = useRef(false);
 
@@ -84,11 +89,28 @@ export const App: React.FC = () => {
       void window.kkachi.markEmailRead(emailId, true);
     });
 
+    const unsubUpdate = window.kkachi.onAppUpdateAvailable((info) => {
+      setUpdateInfo(info);
+      if (info.hasUpdate && dismissedUpdateVersionRef.current !== info.latestVersion) {
+        setUpdateModalOpen(true);
+      }
+    });
+
+    void window.kkachi.checkAppUpdate().then((info) => {
+      if (info.hasUpdate) {
+        setUpdateInfo(info);
+        if (dismissedUpdateVersionRef.current !== info.latestVersion) {
+          setUpdateModalOpen(true);
+        }
+      }
+    });
+
     return () => {
       unsubEmails();
       unsubStatus();
       unsubSettings();
       unsubSelectEmail();
+      unsubUpdate();
     };
   }, [loadData]);
 
@@ -237,6 +259,8 @@ export const App: React.FC = () => {
         onToggleSound={() => void handleToggleSound()}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenSponsor={() => setSponsorModalOpen(true)}
+        updateVersion={updateInfo?.hasUpdate ? updateInfo.latestVersion : null}
+        onOpenUpdate={() => setUpdateModalOpen(true)}
       />
 
       <EmailList
@@ -289,11 +313,25 @@ export const App: React.FC = () => {
           settings={settings}
           onClose={() => setSettingsOpen(false)}
           onSaved={(updated) => setSettings(updated)}
+          onOpenUpdate={(info) => {
+            setUpdateInfo(info);
+            setUpdateModalOpen(true);
+          }}
         />
       )}
 
       {sponsorModalOpen && (
         <SponsorModal onClose={() => setSponsorModalOpen(false)} />
+      )}
+
+      {updateModalOpen && updateInfo && (
+        <UpdateModal
+          info={updateInfo}
+          onClose={() => {
+            dismissedUpdateVersionRef.current = updateInfo.latestVersion;
+            setUpdateModalOpen(false);
+          }}
+        />
       )}
 
       {confirmDeleteAccount && (
