@@ -538,6 +538,7 @@ export class MascotWindowManager {
   private flightMode: MascotFlightMode;
   private flightIntervalSec: number;
   private mascotWin: BrowserWindow | null = null;
+  private winMenuHost: BrowserWindow | null = null;
   private onMoveCallback: (() => void) | null = null;
   private cursorPollTimer: NodeJS.Timeout | null = null;
   private flightScheduleTimer: NodeJS.Timeout | null = null;
@@ -1413,11 +1414,37 @@ export class MascotWindowManager {
     this.onMoveCallback?.();
   }
 
+  private getWindowsMenuHost(): BrowserWindow {
+    if (this.winMenuHost && !this.winMenuHost.isDestroyed()) {
+      return this.winMenuHost;
+    }
+    this.winMenuHost = new BrowserWindow({
+      width: 1,
+      height: 1,
+      x: -10000,
+      y: -10000,
+      show: false,
+      frame: false,
+      transparent: true,
+      skipTaskbar: true,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      hasShadow: false,
+    });
+    this.winMenuHost.removeMenu();
+    this.winMenuHost.on('closed', () => {
+      this.winMenuHost = null;
+    });
+    return this.winMenuHost;
+  }
+
   showMenu(actions: {
     onOpenInbox: (emailId?: string) => void;
     onMarkAllRead?: () => void;
     onCheckNow: () => void;
     onQuit: () => void;
+    popupMenu?: (menu: Menu) => boolean;
   }): void {
     this.cancelFlight(true);
     if (!this.mascotWin || this.mascotWin.isDestroyed()) return;
@@ -1463,23 +1490,27 @@ export class MascotWindowManager {
     );
 
     const menu = Menu.buildFromTemplate(template);
-    menu.popup({
-      window: this.mascotWin,
-      callback: () => {
-        if (process.platform === 'win32' && this.mascotWin && !this.mascotWin.isDestroyed()) {
-          if (this.mascotWin.isFocused()) {
-            this.mascotWin.blur();
-          }
-          this.mascotWin.setBackgroundColor('#00000000');
-          this.mascotWin.webContents.invalidate();
-        }
-      },
-    });
+    if (process.platform === 'win32') {
+      // Never pass mascotWin to TrackPopupMenuEx on Windows: SetForegroundWindow(mascotWin)
+      // activates the frameless transparent window and makes DWM paint a white caption box.
+      // Tray.popUpContextMenu uses Electron's hidden HWND_MESSAGE owner at the cursor position.
+      if (actions.popupMenu?.(menu)) {
+        return;
+      }
+      menu.popup({ window: this.getWindowsMenuHost() });
+      return;
+    }
+
+    menu.popup({ window: this.mascotWin });
   }
 
   destroy(): void {
     this.stopCursorTracking();
     this.stopFlightTimers();
+    if (this.winMenuHost && !this.winMenuHost.isDestroyed()) {
+      this.winMenuHost.destroy();
+    }
+    this.winMenuHost = null;
     if (this.mascotWin && !this.mascotWin.isDestroyed()) {
       this.mascotWin.destroy();
     }

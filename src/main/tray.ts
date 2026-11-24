@@ -101,6 +101,12 @@ export class TrayManager {
     win.focus();
   }
 
+  popUpMenu(menu: Menu): boolean {
+    if (!this.tray || this.tray.isDestroyed()) return false;
+    this.tray.popUpContextMenu(menu);
+    return true;
+  }
+
   destroy(): void {
     if (this.tray) {
       this.tray.destroy();

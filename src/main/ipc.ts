@@ -321,6 +321,7 @@ export function registerIpcHandlers(deps: RegisterIpcDeps): void {
         void monitor.checkNow();
       },
       onQuit: quitApp,
+      popupMenu: (menu) => trayManager?.popUpMenu(menu) ?? false,
     });
   });
 
