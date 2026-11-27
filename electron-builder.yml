@@ -1,6 +1,7 @@
 appId: com.kkachi.mail
 productName: Kkachi
 copyright: Copyright © 2026 Kkachi
+afterPack: scripts/after-pack.cjs
 directories:
   output: release
   buildResources: build
