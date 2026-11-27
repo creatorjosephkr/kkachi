@@ -28,6 +28,8 @@ const api: KkachiAPI = {
     ipcRenderer.invoke('emails:markRead', emailId, isRead),
   markAllRead: (accountId?: string) => ipcRenderer.invoke('emails:markAllRead', accountId),
   deleteEmail: (emailId: string) => ipcRenderer.invoke('emails:delete', emailId),
+  deleteEmails: (emailIds: string[]) => ipcRenderer.invoke('emails:deleteMany', emailIds),
+  deleteAllEmails: (accountId?: string) => ipcRenderer.invoke('emails:deleteAll', accountId),
   translateEmail: (emailId: string, force?: boolean) =>
     ipcRenderer.invoke('emails:translate', emailId, force),
   sendReply: (payload: ReplyPayload) => ipcRenderer.invoke('emails:reply', payload),

@@ -142,6 +142,21 @@ export function registerIpcHandlers(deps: RegisterIpcDeps): void {
     notifyEmailsUpdated();
   });
 
+  ipcMain.handle('emails:deleteMany', (_event, emailIds: string[]) => {
+    if (!Array.isArray(emailIds) || emailIds.length === 0) return;
+    store.deleteEmails(emailIds);
+    for (const emailId of emailIds) {
+      alertManager.clearEmailAlerts({ emailId });
+    }
+    notifyEmailsUpdated();
+  });
+
+  ipcMain.handle('emails:deleteAll', (_event, accountId?: string) => {
+    store.deleteAllEmails(accountId);
+    alertManager.clearEmailAlerts(accountId ? { accountId } : undefined);
+    notifyEmailsUpdated();
+  });
+
   ipcMain.handle('emails:translate', async (_event, emailId: string, force = false) => {
     const email = store.getEmailById(emailId);
     if (!email) return null;

@@ -427,6 +427,9 @@ export const MascotWidget: React.FC = () => {
         type="button"
         className={`mascot-widget ${state.hasNewAlert ? 'has-alert' : ''}`}
         title={tooltip}
+        onFocus={(e) => {
+          e.currentTarget.blur();
+        }}
         onPointerEnter={() => {
           hoveringRef.current = true;
           wakeUp();
@@ -458,7 +461,7 @@ export const MascotWidget: React.FC = () => {
             size={112}
             facing={state.facing}
             holdingLetter={hasNewMail}
-            hideBranch={Boolean(state.isPerchedOnWindow)}
+            hideBranch={Boolean(state.isPerchedOnWindow || state.isStartled)}
             lookX={anim.lookX}
             lookY={anim.lookY}
             mood={anim.mood}

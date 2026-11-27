@@ -313,6 +313,26 @@ export class AppStore {
     this.save();
   }
 
+  deleteEmails(emailIds: string[]): void {
+    if (emailIds.length === 0) return;
+    const idSet = new Set(emailIds);
+    const prevLen = this.data.emails.length;
+    this.data.emails = this.data.emails.filter((e) => !idSet.has(e.id));
+    if (this.data.emails.length !== prevLen) {
+      this.save();
+    }
+  }
+
+  deleteAllEmails(accountId?: string): void {
+    const prevLen = this.data.emails.length;
+    this.data.emails = accountId
+      ? this.data.emails.filter((e) => e.accountId !== accountId)
+      : [];
+    if (this.data.emails.length !== prevLen) {
+      this.save();
+    }
+  }
+
   getUnreadCount(accountId?: string): number {
     return this.data.emails.filter(
       (e) => !e.isRead && (!accountId || e.accountId === accountId)

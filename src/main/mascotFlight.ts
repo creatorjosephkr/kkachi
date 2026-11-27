@@ -87,6 +87,8 @@ export function parseActiveWindowOutput(raw: string): ActiveWindowProbe {
   };
 }
 
+const PERCH_MOVE_THRESHOLD_PX = 6;
+
 export function hasPerchedWindowChanged(
   perched: ActiveWindowInfo,
   current: ActiveWindowInfo
@@ -95,8 +97,9 @@ export function hasPerchedWindowChanged(
     return true;
   }
   if (
-    Math.abs(current.bounds.x - perched.bounds.x) > 80 ||
-    Math.abs(current.bounds.y - perched.bounds.y) > 80
+    Math.abs(current.bounds.x - perched.bounds.x) > PERCH_MOVE_THRESHOLD_PX ||
+    Math.abs(current.bounds.y - perched.bounds.y) > PERCH_MOVE_THRESHOLD_PX ||
+    Math.abs(current.bounds.width - perched.bounds.width) > PERCH_MOVE_THRESHOLD_PX
   ) {
     return true;
   }
@@ -112,7 +115,7 @@ export function getActiveWindowInfo(
       'tell application "System Events"',
       '  set frontApp to first application process whose frontmost is true',
       '  set appName to name of frontApp',
-      '  if appName is "Kkachi" or appName is "Electron" then return "SELF"',
+      '  if appName is "Kkachi" or appName is "까치" or appName is "Electron" then return "SELF"',
       '  tell frontApp',
       '    if (count of windows) > 0 then',
       '      set {wx, wy} to position of front window',

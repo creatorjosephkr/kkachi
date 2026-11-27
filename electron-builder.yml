@@ -13,6 +13,18 @@ mac:
   category: public.app-category.productivity
   icon: build/icon.icns
   artifactName: ${productName}-${version}-macOS-${arch}.${ext}
+  extendInfo:
+    CFBundleDisplayName: Kkachi
+    CFBundleDevelopmentRegion: en
+    CFBundleLocalizations:
+      - ko
+      - en
+    LSHasLocalizedDisplayName: true
+  extraResources:
+    - from: resources/mac/ko.lproj
+      to: ko.lproj
+    - from: resources/mac/en.lproj
+      to: en.lproj
   target:
     - target: dmg
       arch:
@@ -35,3 +47,4 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
+  shortcutName: 까치

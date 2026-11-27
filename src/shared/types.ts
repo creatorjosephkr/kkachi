@@ -201,6 +201,8 @@ export interface KkachiAPI {
   markEmailRead: (emailId: string, isRead: boolean) => Promise<void>;
   markAllRead: (accountId?: string) => Promise<void>;
   deleteEmail: (emailId: string) => Promise<void>;
+  deleteEmails: (emailIds: string[]) => Promise<void>;
+  deleteAllEmails: (accountId?: string) => Promise<void>;
   translateEmail: (emailId: string, force?: boolean) => Promise<EmailMessage | null>;
   sendReply: (payload: ReplyPayload) => Promise<SendReplyResult>;
   printEmail: (emailId: string, mode: EmailExportMode) => Promise<EmailExportResult>;

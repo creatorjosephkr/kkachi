@@ -472,8 +472,10 @@ button {
 
 .list-toolbar button,
 .list-toolbar input,
+.list-toolbar label,
 .list-toolbar .search-box,
-.list-toolbar .segmented {
+.list-toolbar .segmented,
+.list-toolbar .list-selection-bar {
   -webkit-app-region: no-drag;
 }
 
@@ -549,6 +551,51 @@ button {
   box-shadow: var(--shadow-sm);
 }
 
+.btn-danger-text {
+  color: var(--text-muted);
+}
+
+.btn-danger-text:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.btn-danger-soft {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.btn-danger-soft:hover:not(:disabled) {
+  background: var(--danger);
+  color: #ffffff;
+}
+
+.list-selection-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.selection-bar-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.selection-count-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.selection-bar-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .email-list-scroll {
   flex: 1;
   overflow-y: auto;
@@ -556,11 +603,12 @@ button {
 
 .email-row {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 9px;
   width: 100%;
   text-align: left;
-  padding: 11px 14px;
+  padding: 11px 14px 11px 16px;
   border-bottom: 1px solid var(--border);
   transition: background 0.12s ease;
   position: relative;
@@ -575,6 +623,14 @@ button {
   background: var(--bg-surface-active);
 }
 
+.email-row.checked {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.email-row.selected.checked {
+  background: var(--bg-surface-active);
+}
+
 .email-row.unread::before {
   content: '';
   position: absolute;
@@ -584,6 +640,31 @@ button {
   height: 6px;
   border-radius: 999px;
   background: var(--accent);
+}
+
+.email-checkbox-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 2px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.email-checkbox {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin: 0;
+}
+
+.email-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  flex: 1;
 }
 
 .email-row-top {
@@ -1240,7 +1321,17 @@ button {
   padding: 6px;
   border-radius: 24px;
   background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
   transition: transform 0.18s ease;
+}
+
+.mascot-widget:focus,
+.mascot-widget:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
 }
 
 .mascot-widget:hover {

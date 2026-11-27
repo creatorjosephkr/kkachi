@@ -29,6 +29,7 @@ export const App: React.FC = () => {
 
   const [selectedAccountId, setSelectedAccountId] = useState<string | 'all'>('all');
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
+  const [checkedEmailIds, setCheckedEmailIds] = useState<Set<string>>(() => new Set());
   const [viewerOpen, setViewerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterMode, setFilterMode] = useState<'all' | 'unread'>('all');
@@ -41,7 +42,9 @@ export const App: React.FC = () => {
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const dismissedUpdateVersionRef = useRef<string | null>(null);
   const [confirmDeleteAccount, setConfirmDeleteAccount] = useState<AccountPublic | null>(null);
+  const [confirmDeleteAllEmails, setConfirmDeleteAllEmails] = useState(false);
   const deleteBackdropMouseDownRef = useRef(false);
+  const deleteAllBackdropMouseDownRef = useRef(false);
 
   const loadData = useCallback(async () => {
     const [accList, emailList, appSettings, status] = await Promise.all([
@@ -208,8 +211,80 @@ export const App: React.FC = () => {
     if (selectedEmailId === emailId) {
       setSelectedEmailId(null);
     }
+    setCheckedEmailIds((prev) => {
+      if (!prev.has(emailId)) return prev;
+      const next = new Set(prev);
+      next.delete(emailId);
+      return next;
+    });
     void window.kkachi.deleteEmail(emailId);
   };
+
+  const handleToggleCheckEmail = (emailId: string) => {
+    setCheckedEmailIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(emailId)) {
+        next.delete(emailId);
+      } else {
+        next.add(emailId);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleCheckAllVisible = (visibleEmailIds: string[], checked: boolean) => {
+    setCheckedEmailIds((prev) => {
+      const next = new Set(prev);
+      for (const id of visibleEmailIds) {
+        if (checked) {
+          next.add(id);
+        } else {
+          next.delete(id);
+        }
+      }
+      return next;
+    });
+  };
+
+  const handleDeleteSelectedEmails = () => {
+    const ids = Array.from(checkedEmailIds);
+    if (ids.length === 0) return;
+    if (selectedEmailId && checkedEmailIds.has(selectedEmailId)) {
+      setSelectedEmailId(null);
+    }
+    setCheckedEmailIds(new Set());
+    void window.kkachi.deleteEmails(ids);
+  };
+
+  const handleDeleteAllEmailsConfirmed = async () => {
+    const scopeAccountId = selectedAccountId === 'all' ? undefined : selectedAccountId;
+    setConfirmDeleteAllEmails(false);
+    setCheckedEmailIds(new Set());
+    if (
+      selectedEmailId &&
+      accountScopedEmails.some((email) => email.id === selectedEmailId)
+    ) {
+      setSelectedEmailId(null);
+    }
+    await window.kkachi.deleteAllEmails(scopeAccountId);
+  };
+
+  useEffect(() => {
+    setCheckedEmailIds((prev) => {
+      if (prev.size === 0) return prev;
+      const validIds = new Set(accountScopedEmails.map((e) => e.id));
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (validIds.has(id)) {
+          next.add(id);
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [accountScopedEmails]);
 
   const handleTranslateEmail = async (emailId: string, force = false) => {
     await window.kkachi.translateEmail(emailId, force);
@@ -244,6 +319,7 @@ export const App: React.FC = () => {
         onSelectAccount={(id) => {
           setSelectedAccountId(id);
           setSelectedEmailId(null);
+          setCheckedEmailIds(new Set());
           setViewerOpen(false);
         }}
         onAddAccount={() => {
@@ -270,12 +346,18 @@ export const App: React.FC = () => {
         unreadCount={accountUnreadCount}
         accounts={accounts}
         selectedEmailId={selectedEmailId}
+        checkedEmailIds={checkedEmailIds}
         viewerOpen={viewerOpen}
         searchQuery={searchQuery}
         filterMode={filterMode}
         onSearchChange={setSearchQuery}
         onFilterModeChange={setFilterMode}
         onSelectEmail={handleSelectEmail}
+        onToggleCheckEmail={handleToggleCheckEmail}
+        onToggleCheckAllVisible={handleToggleCheckAllVisible}
+        onClearChecked={() => setCheckedEmailIds(new Set())}
+        onDeleteSelectedEmails={handleDeleteSelectedEmails}
+        onRequestDeleteAllEmails={() => setConfirmDeleteAllEmails(true)}
         onToggleRead={handleToggleRead}
         onMarkAllRead={() =>
           void window.kkachi.markAllRead(
@@ -332,6 +414,56 @@ export const App: React.FC = () => {
             setUpdateModalOpen(false);
           }}
         />
+      )}
+
+      {confirmDeleteAllEmails && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(e) => {
+            deleteAllBackdropMouseDownRef.current = e.target === e.currentTarget;
+          }}
+          onClick={(e) => {
+            if (deleteAllBackdropMouseDownRef.current && e.target === e.currentTarget) {
+              setConfirmDeleteAllEmails(false);
+            }
+            deleteAllBackdropMouseDownRef.current = false;
+          }}
+        >
+          <div
+            className="modal-card"
+            style={{ maxWidth: '400px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>모든 이메일 삭제</h2>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '13.5px', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+                <strong>{listTitle}</strong>의 이메일{' '}
+                <strong>{accountScopedEmails.length}통</strong>을 까치에서 모두 삭제하시겠습니까?
+                <br />
+                (실제 메일 서버의 이메일은 삭제되지 않습니다.)
+              </p>
+            </div>
+            <div className="modal-footer" style={{ justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => setConfirmDeleteAllEmails(false)}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ backgroundColor: 'var(--danger)' }}
+                onClick={() => void handleDeleteAllEmailsConfirmed()}
+              >
+                모두 삭제
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {confirmDeleteAccount && (

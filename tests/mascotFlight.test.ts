@@ -128,13 +128,29 @@ describe('mascotFlight helpers', () => {
     });
 
     const perched = parsed.window!;
-    // Same window with minor movement -> not changed
+    // Same window with sub-threshold jitter (<= 6px) -> not changed
     expect(
       hasPerchedWindowChanged(perched, {
         id: 'Safari:GitHub',
-        bounds: { x: 140, y: 190, width: 960, height: 720 },
+        bounds: { x: 123, y: 184, width: 960, height: 720 },
       })
     ).toBe(false);
+
+    // Same window moved by user (> 6px) -> changed (spooks Kkachi)
+    expect(
+      hasPerchedWindowChanged(perched, {
+        id: 'Safari:GitHub',
+        bounds: { x: 140, y: 180, width: 960, height: 720 },
+      })
+    ).toBe(true);
+
+    // Same window resized horizontally (> 6px) -> changed
+    expect(
+      hasPerchedWindowChanged(perched, {
+        id: 'Safari:GitHub',
+        bounds: { x: 120, y: 180, width: 1020, height: 720 },
+      })
+    ).toBe(true);
 
     // Different window activated -> changed
     expect(
